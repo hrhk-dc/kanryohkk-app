@@ -17,7 +17,7 @@ const CLAUDE_TEMPLATE = (url) => `このGoogleマップのリンクからデモ�
 
 const TYPE_LABELS = {
   text: "テキスト", textarea: "長文", select: "選択式", url: "URL", maps: "GoogleマップURL",
-  date: "日付", datetime: "日時", time: "時刻（◯時）", number: "数値", tel: "電話番号",
+  date: "日付", datetime: "日時", time: "時刻（30分刻み）", number: "数値", tel: "電話番号",
   caseNo: "案件番号（訪問リストから自動入力）",
   photo: "写真（撮影・アルバムから）"
 };
@@ -134,7 +134,24 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d); };
-const fmtHour = (v) => (/^\d{1,2}:/.test(v || "") ? `${parseInt(v, 10)}時` : (v || ""));
+const fmtHour = (v) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
+  return m ? (m[2] === "00" ? `${+m[1]}時` : `${+m[1]}時${+m[2]}分`) : (v || "");
+};
+// 時刻は30分刻み。既存データ（分がずれているもの）は直近の30分に丸めて選択状態にする
+const snap30 = (v) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
+  if (!m) return "";
+  return `${String(+m[1]).padStart(2, "0")}:${+m[2] >= 30 ? "30" : "00"}`;
+};
+const timeOptions = (from, to, cur) => {
+  let o = "";
+  for (let h = from; h <= to; h++) for (const m of ["00", "30"]) {
+    const v = `${String(h).padStart(2, "0")}:${m}`;
+    o += `<option value="${v}"${v === cur ? " selected" : ""}>${fmtHour(v)}</option>`;
+  }
+  return o;
+};
 const fmtTs = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" }) : "保存中…");
 const fmtDateJa = (s) => {
   if (!s) return "日付なし";
@@ -709,12 +726,8 @@ function fieldInput(f, value = "") {
     case "date": return `<input type="date" ${attrs} value="${esc(value)}">`;
     case "datetime": return `<input type="datetime-local" ${attrs} value="${esc(value)}">`;
     case "time": {
-      // 時刻は「◯時」だけで選ぶ（分は使わない）。値は並び替えのため "09:00" の形で保存
-      const cur = value ? `${String(value).slice(0, 2)}:00` : "";
-      const opts = Array.from({ length: 24 }, (_, h) => {
-        const v = `${pad(h)}:00`;
-        return `<option value="${v}"${v === cur ? " selected" : ""}>${h}時</option>`;
-      }).join("");
+      // 時刻は30分刻みで選ぶ。値は並び替えのため "09:30" の形で保存
+      const opts = timeOptions(0, 23, snap30(value));
       return `<select ${attrs}><option value="">選択してください</option>${opts}</select>`;
     }
     case "number": return `<input type="number" ${attrs} value="${esc(value)}">`;
@@ -1634,13 +1647,12 @@ function updateCaseNoList() {
     }).join("");
 }
 
-/* 訪問予定時刻：カードの上で「◯時」を選ぶだけ（自分が登録したもの／管理者のみ変更可） */
-const TIME_HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6時〜23時
+/* 訪問予定時刻：カードの上で30分刻みで選ぶだけ（自分が登録したもの／管理者のみ変更可） */
 function timeSelectHtml(v, time) {
-  const h = /^\d{1,2}:/.test(time) ? parseInt(time, 10) : null;
-  if (!canModify(v)) return h !== null ? `<span class="vtime">${ic("clock")}${h}時</span>` : "";
+  const cur = snap30(time);
+  if (!canModify(v)) return cur ? `<span class="vtime">${ic("clock")}${esc(fmtHour(time))}</span>` : "";
   return `<label class="vtime">${ic("clock")}<select data-vtime="${esc(v.id)}" aria-label="訪問予定時刻">
-    <option value="">時間未定</option>${TIME_HOURS.map((x) => `<option value="${pad(x)}:00"${x === h ? " selected" : ""}>${x}時</option>`).join("")}
+    <option value="">時間未定</option>${timeOptions(6, 23, cur)}
   </select></label>`;
 }
 $("#visitList").addEventListener("change", async (e) => {
@@ -1655,7 +1667,7 @@ $("#visitList").addEventListener("change", async (e) => {
   try {
     await updateDoc(doc(db, "visits", v.id), { items, updatedAt: serverTimestamp(), updatedBy: currentUser.email });
     historyUpdate("visits", v, ["items"], { items }, "訪問時刻の変更");
-    toast(sel.value ? `${parseInt(sel.value, 10)}時に変更しました` : "時間を未定にしました");
+    toast(sel.value ? `${fmtHour(sel.value)}に変更しました` : "時間を未定にしました");
   } catch (err) { showBanner(err, "訪問予定時刻の変更"); renderVisitList(); }
 });
 /* 業種が空の訪問先を、Googleマップから読み取って自動入力（空の項目だけ埋める） */
