@@ -1187,6 +1187,16 @@ function autoKeyByLabel(label = "", type = "") {
 }
 const isAutoField = (f) => f.type !== "maps" && !!(f.auto || LOOKUP_MAP[f.id] || autoKeyByLabel(f.label, f.type));
 
+/* 編集のときだけ出す「デモLPのURL」欄（訪問リスト・完了報告の「デモサイトを開く」に使われる） */
+function demoUrlBoxHtml(vals) {
+  const cur = vals.demoUrl || visits.find((x) => x.id === editingVisitId)?.demoUrl || "";
+  return `<div class="demo-url-box">
+    <div class="demo-url-head">${ic("link")}デモLPのURL</div>
+    <input type="url" data-demo-url inputmode="url" placeholder="https://〜.pages.dev" value="${esc(cur)}">
+    <p class="hint">ここに入れたURLが、訪問リストと完了報告の「デモサイトを開く」になります（空にすると自動登録のURLに戻ります）</p>
+  </div>`;
+}
+
 /* 入力するのはGoogleマップのリンクだけ。
    ほかの項目は自動入力され、カードの「確認・修正」を開けばいつでも直せる */
 function renderVisitRows() {
@@ -1202,6 +1212,8 @@ function renderVisitRows() {
       </div>
       ${fieldsHtml(linkFields, vals)}
       ${timeFields.length ? `<div class="row-when">${fieldsHtml(timeFields, vals)}</div>` : ""}
+      <div class="dup-alert hidden"></div>
+      ${editingVisitId ? demoUrlBoxHtml(vals) : ""}
       <div class="row-summary"></div>
       <div class="btn-row" style="margin:4px 0"><button class="btn small" type="button" data-relookup="${idx}">${ic("refresh")}マップから読み取り直す（店舗名・県・市・区・業種・営業時間を上書き）</button></div>
       <details class="row-more"${editingVisitId || !linkFields.length ? " open" : ""}>
@@ -1237,7 +1249,8 @@ async function addLinksAsRows(links, replaceRowEl = null) {
   fresh.forEach((u) => visitRows.push({ [mapsField.id]: u }));
   renderVisitRows();
   const cards = [...document.querySelectorAll("#visitRows .row-card")].slice(start);
-  toast(`${fresh.length}件を追加しました${dup ? `（同じリンク${dup}件は省きました）` : ""}。店舗情報を読み取ります`);
+  const visited = fresh.filter((u) => findDupVisits(u).length).length;
+  toast(visited ? `以前に登録した店舗のリンクが${visited}件あります（カードの黄色い表示を確認してください）` : `${fresh.length}件を追加しました${dup ? `（同じリンク${dup}件は省きました）` : ""}。店舗情報を読み取ります`);
   for (const c of cards) await lookupRow(c);
   toast("読み取りが終わりました。内容を確認して保存してください");
 }
@@ -1311,6 +1324,7 @@ function applyLookup(row, info, overwrite = false) {
 
 /* 行の上に「読み取った内容」の要約を出す（修正は「確認・修正」を開いて行う） */
 function updateRowSummary(row) {
+  updateDupAlert(row);
   const box = row.querySelector(".row-summary");
   if (!box) return;
   const val = (id) => row.querySelector(`[data-field-id="${CSS.escape(id)}"]`)?.value.trim() || "";
@@ -1346,8 +1360,7 @@ async function lookupRow(row, overwrite = false) {
     const n = applyLookup(row, info, overwrite);
     const what = [info.name, info.area, info.category && `業種：${info.category}${info.categorySource ? `（${info.categorySource}）` : ""}`].filter(Boolean).join("・");
     const note = (info.notes || []).join(" / ");
-    const dup = duplicateNote(row, info);
-    setRowStatus(row, `${what || "読み取りました"}${n ? `（${n}項目を入力）` : "（空欄はありませんでした）"}${note ? `　※${note}` : ""}${dup ? `\n${dup}` : ""}`, dup ? "ok dup" : "ok");
+    setRowStatus(row, `${what || "読み取りました"}${n ? `（${n}項目を入力）` : "（空欄はありませんでした）"}${note ? `　※${note}` : ""}`, "ok");
     return info;
   } catch (err) {
     const why = err.code === "lookup-missing" ? "読み取り機能がまだサーバーに入っていません（管理者に連絡してください）" : explainError(err).cause;
@@ -1368,7 +1381,12 @@ $("#visitRows").addEventListener("click", async (e) => {
 // マップのURLを貼ったら自動で読み取る
 $("#visitRows").addEventListener("change", (e) => {
   const el = e.target.closest("[data-field-id]");
-  if (el && formats.visit.find((f) => f.id === el.dataset.fieldId)?.type === "maps") lookupRow(el.closest(".row-card"));
+  if (el && formats.visit.find((f) => f.id === el.dataset.fieldId)?.type === "maps") {
+    const row = el.closest(".row-card");
+    const hits = updateDupAlert(row);
+    if (hits.length) toast(dupText(hits));
+    lookupRow(row);
+  }
 });
 
 /* リンクをまとめて貼り付け → 1リンク1行で作って読み取る */
@@ -1438,16 +1456,31 @@ $("#visitForm").addEventListener("submit", async (e) => {
     }
   }
 
+  if (!editingVisitId) {
+    const dupRows = filled.filter((r) => dupVisitsOfRow(rowEls[r.idx]).length);
+    if (dupRows.length && !confirm(`以前に訪問リストに登録した店舗が${dupRows.length}件あります（カードの黄色い表示を確認してください）。\nこのまま保存しますか？`)) {
+      rowEls[dupRows[0].idx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+  }
+
   $("#saveVisits").disabled = true;
   try {
     if (editingVisitId) {
       const prevV = visits.find((x) => x.id === editingVisitId);
+      const demoIn = rowEls[0]?.querySelector("[data-demo-url]");
+      const du = demoIn ? demoIn.value.trim() : "";
+      if (demoIn) {
+        if (du && !/^https?:\/\/\S+\.\S+/.test(du)) { errEl.textContent = "デモLPのURLは https:// から始まる形で入れてください。"; demoIn.focus(); return; }
+        filled[0].items = filled[0].items.filter((i) => i.id !== "demoUrl");
+        if (du) filled[0].items.push({ id: "demoUrl", label: "デモサイトURL", type: "url", value: du });
+      }
       await updateDoc(doc(db, "visits", editingVisitId), {
         visitDate, items: filled[0].items,
         updatedAt: serverTimestamp(), updatedBy: currentUser.email
       });
       if (prevV) historyUpdate("visits", prevV, ["visitDate", "items"], { visitDate, items: filled[0].items }, "訪問先の編集");
-      toast("更新しました");
+      toast(du && du !== (prevV?.demoUrl || "") ? "更新しました（デモLPのURLを登録しました）" : "更新しました");
       if (prevV?.caseNo && itemVal(prevV.items, "mapsUrl") !== itemVal(filled[0].items, "mapsUrl")) queueDemos([{ caseNo: prevV.caseNo, visitDate, items: filled[0].items }]);
     } else {
       // 案件番号は共通カウンターから連番で取る（同時に保存しても番号が被らない）
@@ -1747,7 +1780,7 @@ function renderVisitList() {
       (cat ? `<span class="tag cat" title="業種">${ic("tag")}${esc(cat)}</span>` : `<span class="tag none" title="業種">${ic("tag")}業種：未取得</span>${canModify(v) ? `<button class="btn small" type="button" data-fillcat="${esc(v.id)}">業種を自動入力</button>` : ""}`);
     const hoursHtml = hoursTxt ? `<p class="visit-hours">${ic("clock")}営業時間：${esc(hoursTxt.split("\n")[0])}${hoursTxt.includes("\n") ? ` <small>ほか（下の「店舗の詳細」に全部あります）</small>` : ""}</p>` : "";
     const moveBtns = sort === "manual" ? `<span class="move-btns"><button class="btn small" type="button" data-vmove="-1" data-id="${esc(v.id)}" title="上へ" aria-label="上へ">${ic("up")}</button><button class="btn small" type="button" data-vmove="1" data-id="${esc(v.id)}" title="下へ" aria-label="下へ">${ic("down")}</button></span>` : "";
-    const rest = items.filter((i, k) => k !== titleIdx && !subIds.includes(i.id) && i.type !== "time");
+    const rest = items.filter((i, k) => k !== titleIdx && !subIds.includes(i.id) && i.id !== "demoUrl" && i.type !== "time");
     const main = rest.filter((i) => ["personName", "phone", "maps", "memo"].includes(i.id) || i.type === "maps");
     const more = [...items.filter((i) => i.id === "hours" && i.value), ...rest.filter((i) => !main.includes(i))];
     const actions = canModify(v) ? `
@@ -2170,21 +2203,44 @@ document.addEventListener("click", async (e) => {
 });
 
 /* ---------- 同じ店舗の重複チェック ---------- */
-function duplicateNote(row, info) {
-  const mapsField = formats.visit.find((f) => f.type === "maps");
-  const url = row.querySelector(`[data-field-id="${CSS.escape(mapsField?.id || "")}"]`)?.value.trim();
-  const name = (info?.name || "").replace(/\s/g, "");
-  const city = info?.city || info?.ward || "";
-  const hits = visits.filter((v) => {
+/* リンクの比べ方：共有用の付け足し（?g_st= など）や末尾の / の違いは同じリンクとみなす */
+function normMapsUrl(u) {
+  let t = String(u || "").trim().replace(/#.*$/, "");
+  if (/goo\.gl\//i.test(t)) t = t.replace(/\?.*$/, ""); // 短縮リンクは ? 以降を見ない
+  return t.replace(/\/+$/, "").replace(/^http:/i, "https:").toLowerCase();
+}
+function findDupVisits(url, name = "", city = "") {
+  const key = url ? normMapsUrl(url) : "";
+  const nm = String(name || "").replace(/\s/g, "");
+  return visits.filter((v) => {
     if (editingVisitId && v.id === editingVisitId) return false;
-    const vu = (v.items || []).find((i) => i.type === "maps")?.value?.trim();
+    const vu = (v.items || []).find((i) => i.type === "maps")?.value;
     const vn = textOf(v, "shopName").replace(/\s/g, "");
-    return (url && vu === url) || (name && vn === name && (!city || placeOf(v).includes(city)));
+    return (key && vu && normMapsUrl(vu) === key) || (nm && vn === nm && (!city || placeOf(v).includes(city)));
   }).sort((a, b) => caseNum(b) - caseNum(a));
+}
+function dupVisitsOfRow(row) {
+  if (!row) return [];
+  const val = (id) => row.querySelector(`[data-field-id="${CSS.escape(id)}"]`)?.value.trim() || "";
+  const mapsField = formats.visit.find((f) => f.type === "maps");
+  return findDupVisits(mapsField ? val(mapsField.id) : "", val("shopName"), val("city") || val("ward"));
+}
+const wasVisited = (v) => visitStatus(v).done || (v.visitDate && v.visitDate < today());
+function dupText(hits) {
   if (!hits.length) return "";
   const v = hits[0];
   const st = visitStatus(v);
-  return `以前にも登録あり：${v.caseNo || ""}（${fmtDateJa(v.visitDate)}${personOf(v) ? `・${personOf(v)}` : ""}${st.done ? `・結果：${st.result || "報告済み"}` : "・未報告"}）${hits.length > 1 ? ` ほか${hits.length - 1}件` : ""}`;
+  const head = wasVisited(v) ? "以前訪問済みの店舗です" : "すでに訪問リストに登録されています";
+  return `${head}：${v.caseNo || ""}（${fmtDateJa(v.visitDate)}${personOf(v) ? `・${personOf(v)}` : ""}${st.done ? `・結果：${st.result || "報告済み"}` : "・未報告"}）${hits.length > 1 ? ` ほか${hits.length - 1}件` : ""}`;
+}
+/* カードに黄色の警告を出す（リンクを貼った時点・読み取った後の両方で確認） */
+function updateDupAlert(row) {
+  const box = row?.querySelector(".dup-alert");
+  if (!box) return [];
+  const hits = dupVisitsOfRow(row);
+  box.classList.toggle("hidden", !hits.length);
+  box.innerHTML = hits.length ? `${ic("alert")}<span>${esc(dupText(hits))}</span>` : "";
+  return hits;
 }
 
 /* ---------- 写真（端末で小さくしてから保存） ---------- */
@@ -2570,7 +2626,9 @@ let demoTimer = null;
 function applyDemoUrls() {
   visits.forEach((v) => {
     const d = v.caseNo && demoUrls[String(v.caseNo).toUpperCase()];
-    if (d?.url) v.demoUrl = d.url;
+    const manual = itemVal(v.items, "demoUrl"); // 編集画面で入れたURLを優先
+    if (manual) v.demoUrl = manual;
+    else if (d?.url) v.demoUrl = d.url;
   });
 }
 async function loadDemoUrls() {

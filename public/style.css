@@ -412,3 +412,15 @@ body:not(.logged-in) .hidden-logged-out { display: none; }
 
 /* ボタン列の中のラベルは高さを伸ばさない */
 .btn-row > .badge, .btn-row > .case-no, .btn-row > .due { align-self: center; }
+
+/* 以前訪問済みの警告（黄＝注意） */
+.dup-alert { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 10px 12px; border-radius: 14px;
+  background: rgba(255, 200, 61, .16); color: #ffd56b; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.dup-alert.hidden { display: none; }
+.dup-alert .ic { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+/* 編集画面のデモLPのURL欄 */
+.demo-url-box { margin: 10px 0; padding: 12px; border-radius: 16px; background: var(--tile); }
+.demo-url-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.demo-url-head .ic { color: var(--blue); width: 16px; height: 16px; }
+.demo-url-box input { width: 100%; }
+.demo-url-box .hint { margin: 6px 0 0; }
