@@ -272,6 +272,12 @@
         </div>
         <div id="statsSummary" class="stats-summary"></div>
         <h3 class="stats-h">日報（数字）</h3>
+        <div class="daily-pick">
+          <label>年<select id="dailyYear"></select></label>
+          <label>日付（この日までの7日間）<select id="dailyDate"></select></label>
+          <button class="btn small ghost hidden" type="button" id="dailyToday">今日に戻る</button>
+        </div>
+        <p class="hint" id="dailyRange"></p>
         <div id="statsDaily"></div>
         <div class="btn-row"><button class="btn small primary" type="button" id="copyDaily">日報をコピー（LINE・メール用）</button></div>
         <h3 class="stats-h">担当者別</h3>

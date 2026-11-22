@@ -2513,6 +2513,59 @@ function dailyText(range, vs, rs) {
 }
 let lastDaily = "";
 
+/* ---------- 日報（数字）：1週間ぶんを表示。日付が変わるたびに自動で更新 ---------- */
+let dailyEnd = null;       // null＝今日までの7日間（日付が変わると自動で進む）
+let dailyShownToday = today();
+const slashDate = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}(${"日月火水木金土"[new Date(`${d}T00:00:00`).getDay()]})`; // 西暦なし
+function renderDaily() {
+  const box = $("#statsDaily");
+  if (!box) return;
+  const t = today();
+  dailyShownToday = t;
+  if (dailyEnd && dailyEnd > t) dailyEnd = null;
+  const end = dailyEnd || t, start = addDays(end, -6);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(end, -i)); // 新しい日が上
+  const dvs = visits.filter((v) => v.visitDate && v.visitDate >= start && v.visitDate <= end);
+  const drs = reports.filter((r) => { const d = reportDay(r); return d >= start && d <= end; });
+  const range = { from: start, to: end, text: `${slashDate(start)} 〜 ${slashDate(end)}` };
+  const { results, cnt } = dailyNumbers(start, end, dvs, drs);
+
+  // 年・日付の選択（年を選ぶと、その年の日付だけが選べる）
+  const thisY = Number(t.slice(0, 4));
+  const minY = Math.min(thisY, ...visits.map((v) => Number((v.visitDate || "").slice(0, 4))).filter(Boolean), ...reports.map((r) => Number(reportDay(r).slice(0, 4))).filter(Boolean));
+  const selY = Number(end.slice(0, 4));
+  const ySel = $("#dailyYear"), dSel = $("#dailyDate");
+  if (ySel && dSel) {
+    ySel.innerHTML = Array.from({ length: thisY - minY + 1 }, (_, i) => thisY - i).map((y) => `<option value="${y}">${y}年</option>`).join("");
+    ySel.value = String(selY);
+    const last = selY === thisY ? t : `${selY}-12-31`;
+    const n = Math.round((new Date(`${last}T00:00:00`) - new Date(`${selY}-01-01T00:00:00`)) / 864e5) + 1;
+    dSel.innerHTML = Array.from({ length: n }, (_, i) => addDays(last, -i)).map((d) => `<option value="${d}">${slashDate(d)}</option>`).join("");
+    dSel.value = end;
+    $("#dailyRange").textContent = `${range.text} の7日間`;
+    $("#dailyToday").classList.toggle("hidden", !dailyEnd);
+  }
+
+  box.innerHTML = `<div class="stat-table daily" style="--cols:${results.length + 2}">
+    <div class="st-head"><span>日付</span><span>訪問</span><span>報告</span>${results.map((k) => `<span>${esc(k)}</span>`).join("")}</div>` +
+    days.map((d) => {
+      const dv = dvs.filter((v) => v.visitDate === d), dr = drs.filter((r) => reportDay(r) === d), c = cnt(dr);
+      return `<div class="st-row"><span class="st-key">${esc(slashDate(d))}</span><span>${dv.length}</span><span>${dr.length}</span>${results.map((k) => `<span${k === "成約" ? ' class="st-won"' : ""}>${c[k] || 0}</span>`).join("")}</div>`;
+    }).join("") + "</div>";
+  lastDaily = dailyText(range, dvs, drs);
+}
+$("#dailyYear")?.addEventListener("change", (e) => {
+  const y = e.target.value, cur = dailyEnd || today();
+  let d = `${y}-${cur.slice(5)}`;
+  if (Number.isNaN(new Date(`${d}T00:00:00`).getTime()) || d.slice(0, 4) !== y) d = `${y}-12-31`;
+  dailyEnd = d >= today() ? null : d;
+  renderDaily();
+});
+$("#dailyDate")?.addEventListener("change", (e) => { dailyEnd = e.target.value >= today() ? null : e.target.value; renderDaily(); });
+$("#dailyToday")?.addEventListener("click", () => { dailyEnd = null; renderDaily(); });
+// 日付が変わったら、見ている日報を今日に合わせて更新する
+setInterval(() => { if (today() !== dailyShownToday && isAdmin()) renderDaily(); }, 30000);
+
 function renderStats() {
   if (!isAdmin() || !$("#statsPerson")) return;
   syncStatsInputs();
@@ -2533,16 +2586,7 @@ function renderStats() {
   const totalWon = rs.filter(won).length;
   $("#statsSummary").innerHTML = `<div><b>${vs.length}</b><small>訪問</small></div><div><b>${rs.length}</b><small>報告</small></div><div class="st-won"><b>${totalWon}</b><small>成約</small></div><div><b>${pct(totalWon, rs.length)}%</b><small>成約率</small></div>`;
 
-  // 日報（数字）：日ごとの件数表（最大31日）＋コピー用の文章
-  const { results, cnt } = dailyNumbers(range.from, range.to, vs, rs);
-  const days = [...new Set([...vs.map((v) => v.visitDate), ...rs.map(reportDay)].filter(Boolean))].sort().reverse().slice(0, 31);
-  $("#statsDaily").innerHTML = days.length ? `<div class="stat-table daily" style="--cols:${results.length + 2}">
-    <div class="st-head"><span>日付</span><span>訪問</span><span>報告</span>${results.map((k) => `<span>${esc(k)}</span>`).join("")}</div>` +
-    days.map((d) => {
-      const dv = vs.filter((v) => v.visitDate === d), dr = rs.filter((r) => reportDay(r) === d), c = cnt(dr);
-      return `<div class="st-row"><span class="st-key">${esc(fmtDateJa(d))}</span><span>${dv.length}</span><span>${dr.length}</span>${results.map((k) => `<span${k === "成約" ? ' class="st-won"' : ""}>${c[k] || 0}</span>`).join("")}</div>`;
-    }).join("") + "</div>" : `<p class="empty">この期間のデータがありません</p>`;
-  lastDaily = dailyText(range, vs, rs);
+  renderDaily(); // 日報（数字）は上の集計の期間とは別に、1週間ずつ表示する
 
   $("#statsPerson").innerHTML = statTable(group(personOf, reportPerson), "担当者");
   const reportPlace = (r) => {
