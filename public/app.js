@@ -138,20 +138,103 @@ const fmtHour = (v) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
   return m ? (m[2] === "00" ? `${+m[1]}時` : `${+m[1]}時${+m[2]}分`) : (v || "");
 };
-// 時刻は30分刻み。既存データ（分がずれているもの）は直近の30分に丸めて選択状態にする
-const snap30 = (v) => {
+// 時刻は10分刻み。既存データ（分がずれているもの）は直前の10分に丸めて選択状態にする
+const snap10 = (v) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
   if (!m) return "";
-  return `${String(+m[1]).padStart(2, "0")}:${+m[2] >= 30 ? "30" : "00"}`;
+  return `${String(+m[1]).padStart(2, "0")}:${String(Math.floor(+m[2] / 10) * 10).padStart(2, "0")}`;
 };
-const timeOptions = (from, to, cur) => {
-  let o = "";
-  for (let h = from; h <= to; h++) for (const m of ["00", "30"]) {
-    const v = `${String(h).padStart(2, "0")}:${m}`;
-    o += `<option value="${v}"${v === cur ? " selected" : ""}>${fmtHour(v)}</option>`;
+
+/* ---------- 時刻ピッカー：スマホのアラーム設定と同じ、上下に回して選ぶ形（時・分は10分刻み） ---------- */
+const TS_H = 44; // 1行の高さ(px)。style.css の .ts-item と同じ値
+const pad2 = (n) => String(n).padStart(2, "0");
+let tsDone = null;
+function tsEnsure() {
+  let el = document.getElementById("timeSheet");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "timeSheet";
+  el.className = "time-sheet overlay hidden";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.innerHTML = `<div class="ts-backdrop" data-ts="cancel"></div>
+    <div class="ts-panel">
+      <div class="ts-head"><button type="button" class="ts-link" data-ts="cancel">キャンセル</button><b id="tsTitle">時間を選ぶ</b><button type="button" class="ts-link ts-ok" data-ts="ok">完了</button></div>
+      <div class="ts-wheels"><div class="ts-mark"></div><div class="ts-col" id="tsH" aria-label="時"></div><span class="ts-colon">:</span><div class="ts-col" id="tsM" aria-label="分"></div></div>
+      <button type="button" class="btn ghost full" data-ts="clear">時間未定にする</button>
+    </div>`;
+  document.body.appendChild(el);
+  const fill = (col, vals) => { col.innerHTML = vals.map((v) => `<div class="ts-item" data-v="${v}">${v}</div>`).join(""); };
+  fill(el.querySelector("#tsH"), Array.from({ length: 24 }, (_, i) => pad2(i)));
+  fill(el.querySelector("#tsM"), Array.from({ length: 6 }, (_, i) => pad2(i * 10)));
+  el.querySelectorAll(".ts-col").forEach((col) => {
+    let tick = false;
+    col.addEventListener("scroll", () => {
+      if (tick) return; tick = true;
+      requestAnimationFrame(() => { tsMark(col); tick = false; });
+    }, { passive: true });
+    col.addEventListener("click", (e) => {
+      const it = e.target.closest(".ts-item");
+      if (it) col.scrollTo({ top: [...col.children].indexOf(it) * TS_H, behavior: "smooth" });
+    });
+  });
+  el.addEventListener("click", (e) => {
+    const act = e.target.closest("[data-ts]")?.dataset.ts;
+    if (!act) return;
+    const done = tsDone;
+    const val = `${tsValue(el.querySelector("#tsH"))}:${tsValue(el.querySelector("#tsM"))}`;
+    tsClose();
+    if (act === "ok" && done) done(val);
+    if (act === "clear" && done) done("");
+  });
+  return el;
+}
+const tsIndex = (col) => Math.max(0, Math.min(col.children.length - 1, Math.round(col.scrollTop / TS_H)));
+const tsValue = (col) => col.children[tsIndex(col)].dataset.v;
+function tsMark(col) { [...col.children].forEach((c, i) => c.classList.toggle("on", i === tsIndex(col))); }
+function tsSet(col, v) {
+  const i = Math.max(0, [...col.children].findIndex((c) => c.dataset.v === v));
+  col.scrollTop = i * TS_H;
+  tsMark(col);
+}
+function tsClose() {
+  document.getElementById("timeSheet")?.classList.add("hidden");
+  document.body.style.overflow = "";
+  tsDone = null;
+}
+function openTimePicker({ value, title, onDone }) {
+  const el = tsEnsure();
+  tsDone = onDone;
+  el.querySelector("#tsTitle").textContent = title || "時間を選ぶ";
+  el.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  const [h, m] = (snap10(value) || "09:00").split(":");
+  requestAnimationFrame(() => { tsSet(el.querySelector("#tsH"), h); tsSet(el.querySelector("#tsM"), m); });
+}
+document.addEventListener("click", (e) => {
+  const fb = e.target.closest("[data-timepick]");
+  if (fb) {
+    const input = fb.parentElement.querySelector("input[data-field-id]");
+    if (!input) return;
+    openTimePicker({
+      value: input.value, title: fb.dataset.timepick || "時間を選ぶ",
+      onDone: (val) => {
+        input.value = val;
+        fb.textContent = val ? fmtHour(val) : "時間を選ぶ";
+        fb.classList.toggle("empty-val", !val);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    return;
   }
-  return o;
-};
+  const vb = e.target.closest("[data-vtime-pick]");
+  if (vb) {
+    const v = visits.find((x) => x.id === vb.dataset.vtimePick);
+    if (!v || !canModify(v)) return;
+    openTimePicker({ value: (v.items || []).find((i) => i.type === "time")?.value || "", title: "訪問予定時刻", onDone: (val) => saveVisitTime(v, val) });
+  }
+});
 const fmtTs = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" }) : "保存中…");
 const fmtDateJa = (s) => {
   if (!s) return "日付なし";
@@ -751,9 +834,9 @@ function fieldInput(f, value = "") {
     case "date": return `<input type="date" ${attrs} value="${esc(value)}">`;
     case "datetime": return `<input type="datetime-local" ${attrs} value="${esc(value)}">`;
     case "time": {
-      // 時刻は30分刻みで選ぶ。値は並び替えのため "09:30" の形で保存
-      const opts = timeOptions(0, 23, snap30(value));
-      return `<select ${attrs}><option value="">選択してください</option>${opts}</select>`;
+      // 時刻はアラームのように回して選ぶ（10分刻み）。値は並び替えのため "09:30" の形で保存
+      const cur = snap10(value);
+      return `<span class="time-field"><input type="hidden" ${attrs} value="${esc(cur)}"><button type="button" class="time-btn${cur ? "" : " empty-val"}" data-timepick="${esc(f.label || "時間を選ぶ")}">${cur ? esc(fmtHour(cur)) : "時間を選ぶ"}</button></span>`;
     }
     case "number": return `<input type="number" ${attrs} value="${esc(value)}">`;
     case "tel": return `<input type="tel" ${attrs} value="${esc(value)}">`;
@@ -1705,29 +1788,24 @@ function updateCaseNoList() {
     }).join("");
 }
 
-/* 訪問予定時刻：カードの上で30分刻みで選ぶだけ（自分が登録したもの／管理者のみ変更可） */
+/* 訪問予定時刻：カードの上の時刻をタップして、アラームのように回して選ぶ（10分刻み。自分が登録したもの／管理者のみ変更可） */
 function timeSelectHtml(v, time) {
-  const cur = snap30(time);
+  const cur = snap10(time);
   if (!canModify(v)) return cur ? `<span class="vtime">${ic("clock")}${esc(fmtHour(time))}</span>` : "";
-  return `<label class="vtime">${ic("clock")}<select data-vtime="${esc(v.id)}" aria-label="訪問予定時刻">
-    <option value="">時間未定</option>${timeOptions(6, 23, cur)}
-  </select></label>`;
+  return `<span class="vtime">${ic("clock")}<button type="button" class="time-btn small${cur ? "" : " empty-val"}" data-vtime-pick="${esc(v.id)}" aria-label="訪問予定時刻">${cur ? esc(fmtHour(cur)) : "時間未定"}</button></span>`;
 }
-$("#visitList").addEventListener("change", async (e) => {
-  const sel = e.target.closest("select[data-vtime]");
-  if (!sel) return;
-  const v = visits.find((x) => x.id === sel.dataset.vtime);
+async function saveVisitTime(v, value) {
   if (!v || !canModify(v)) return;
   const items = clone(v.items || []);
   const t = items.find((i) => i.type === "time");
-  if (t) t.value = sel.value;
-  else items.push({ id: "visitTime", label: "訪問予定時刻", type: "time", value: sel.value });
+  if (t) t.value = value;
+  else items.push({ id: "visitTime", label: "訪問予定時刻", type: "time", value });
   try {
     await updateDoc(doc(db, "visits", v.id), { items, updatedAt: serverTimestamp(), updatedBy: currentUser.email });
     historyUpdate("visits", v, ["items"], { items }, "訪問時刻の変更");
-    toast(sel.value ? `${fmtHour(sel.value)}に変更しました` : "時間を未定にしました");
+    toast(value ? `${fmtHour(value)}に変更しました` : "時間を未定にしました");
   } catch (err) { showBanner(err, "訪問予定時刻の変更"); renderVisitList(); }
-});
+}
 /* 業種が空の訪問先を、Googleマップから読み取って自動入力（空の項目だけ埋める） */
 $("#visitList").addEventListener("click", async (e) => {
   const fb = e.target.closest("button[data-fillcat]");
