@@ -618,3 +618,11 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 /* 上のバー：下にスクロールしたら隠れ、一番上に戻ったときだけ出る */
 .topbar { transition: transform .3s var(--ease), opacity .3s ease; }
 .topbar.hide { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+
+/* 集計の日報（数字）：表だけ横にスクロールできる。日付の列は左に固定 */
+#statsDaily { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px 6px; }
+.stat-table.daily { min-width: calc(110px + var(--cols, 5) * 60px + 60px); }
+.stat-table.daily .st-head, .stat-table.daily .st-row { grid-template-columns: 110px repeat(calc(var(--cols, 5) + 1), minmax(56px, 1fr)); }
+.stat-table.daily .st-head span:first-child, .stat-table.daily .st-row span:first-child {
+  position: sticky; left: 0; z-index: 1; background: var(--card); padding-right: 6px;
+}
