@@ -1327,7 +1327,7 @@ function demoUrlBoxHtml(vals) {
   return `<div class="demo-url-box">
     <div class="demo-url-head">${ic("link")}デモLPのURL</div>
     <input type="url" data-demo-url inputmode="url" placeholder="https://〜.pages.dev" value="${esc(cur)}">
-    <p class="hint">ここに入れたURLが、訪問リストと完了報告の「デモサイトを開く」になります（空にすると自動登録のURLに戻ります）</p>
+    <p class="hint">ここに入れたURLが、訪問リストと完了報告の「デモサイトを開く」になります。<br>空にすると、自動登録のURLに戻ります。</p>
   </div>`;
 }
 
@@ -1983,7 +1983,7 @@ function renderFieldEditor() {
       <input type="checkbox" id="naRequiredToggle"${draftNaRequired ? " checked" : ""}>
       完了報告で「次回アクション」の入力を必須にする
     </label>
-    <p class="hint">オフにすると、次回アクションを空欄のまま完了報告を保存できます（入力した場合は、下の各項目の「必須」がチェックされます）。</p>` : "";
+    <p class="hint">オフにすると、次回アクションが空欄でも完了報告を保存できます。<br>入力した場合は、下の各項目の「必須」がチェックされます。</p>` : "";
 
   const typeOpts = (cur) => Object.entries(TYPE_LABELS)
     .map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${l}</option>`).join("");

@@ -621,11 +621,14 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 
 /* 集計の日報（数字）：表だけ横にスクロールできる。日付の列は左に固定 */
 #statsDaily { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px 6px; }
-.stat-table.daily { min-width: calc(110px + var(--cols, 5) * 60px + 60px); }
-.stat-table.daily .st-head, .stat-table.daily .st-row { grid-template-columns: 110px repeat(calc(var(--cols, 5) + 1), minmax(56px, 1fr)); }
+.stat-table.daily { min-width: calc(72px + var(--cols, 5) * 56px + 56px); }
+.stat-table.daily .st-head, .stat-table.daily .st-row { grid-template-columns: 72px repeat(calc(var(--cols, 5) + 1), minmax(52px, 1fr)); gap: 4px; }
 .stat-table.daily .st-head span:first-child, .stat-table.daily .st-row span:first-child {
-  position: sticky; left: 0; z-index: 1; background: var(--card); padding-right: 6px;
+  position: sticky; left: 0; z-index: 1; background: var(--card); padding-right: 2px; white-space: nowrap;
 }
+
+/* 説明文：行間を少し広げて読みやすくする（改行は文の区切りに入れてある） */
+.hint { line-height: 1.75; }
 
 /* 日報（数字）：年・日付の選択 */
 .daily-pick { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; align-items: end; margin: 4px 0 4px; }

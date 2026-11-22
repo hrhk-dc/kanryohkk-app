@@ -174,7 +174,7 @@
     <div id="tab-form" class="tab-panel hidden">
       <form id="reportForm" class="card" novalidate>
         <h2 id="formTitle">完了報告</h2>
-        <p class="hint" id="caseHint">1日に複数の案件を回った場合は「別の案件を追加」で、まとめて報告できます。</p>
+        <p class="hint" id="caseHint">1日に複数の案件を回ったときは、<br>「別の案件を追加」でまとめて報告できます。</p>
         <div id="reportCases"></div>
 
         <p id="formError" class="error"></p>
@@ -199,7 +199,7 @@
           <div class="btn-row">
             <button class="btn small primary" type="button" id="bulkPaste"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="16" rx="3"/><path d="M9 4.5V3.8c0-.7.5-1.3 1.2-1.3h3.6c.7 0 1.2.6 1.2 1.3v.7M8.5 11h7M8.5 15h4.5"/></svg>貼り付け</button>
           </div>
-          <p class="hint">貼り付けると自動で読み取り、<b>リンク1つにつき1件</b>のカードを作ります。店舗名・住所・営業時間などは自動で入ります。間違っていたら、カードの中で直接書き換えてください。案件番号は保存したときに1件ずつ自動で付きます。</p>
+          <p class="hint">貼り付けると、<b>リンク1つにつき1件</b>のカードを作ります。<br>店舗名・住所・営業時間などは自動で入ります。<br>間違っていたら、カードの中で直接書き換えられます。<br>案件番号は、保存したときに自動で付きます。</p>
         </div>
         <div id="visitRows"></div>
         <p id="visitError" class="error"></p>
@@ -293,7 +293,7 @@
     <div id="tab-admin" class="tab-panel hidden">
       <div class="card">
         <h2>メンバー管理</h2>
-        <p class="hint">ここに登録したメールアドレスの人だけがアプリを使えます。「管理者」にした人は、フォーマット編集・集計・メンバー管理もできます。</p>
+        <p class="hint">登録したメールアドレスの人だけが、アプリを使えます。<br>「管理者」にすると、フォーマット編集・集計・メンバー管理もできます。</p>
         <div id="requestList"></div>
         <div class="member-add">
           <input type="email" id="newMemberEmail" placeholder="追加するメールアドレス">
@@ -305,7 +305,7 @@
 
       <div class="card">
         <h2>データのバックアップ（CSV）</h2>
-        <p class="hint">Excelでそのまま開けるCSVファイルでダウンロードします。定期的に保存しておくと安心です。</p>
+        <p class="hint">Excelでそのまま開けるCSVで、ダウンロードします。<br>定期的に保存しておくと安心です。</p>
         <div class="btn-row">
           <button class="btn" type="button" id="exportReports">完了報告をダウンロード</button>
           <button class="btn" type="button" id="exportVisits">訪問リストをダウンロード</button>
@@ -314,14 +314,14 @@
 
       <div class="card">
         <h2>訪問先の読み取り直し</h2>
-        <p class="hint">登録済みの訪問先のうち、店舗名に住所などが混ざっているもの・県/市/区や業種が空のものを、Googleマップのリンクから読み取り直して、店舗名／都道府県／市／区／業種／営業時間を別々の項目に入れ直します。</p>
+        <p class="hint">店舗名に住所が混ざっているものや、県・市・区、業種が空のものを、<br>Googleマップのリンクから読み取り直します。<br>店舗名／都道府県／市／区／業種／営業時間が、別々の項目に入ります。</p>
         <div class="btn-row"><button class="btn" type="button" id="repairVisits">読み取り直しを実行</button></div>
         <p class="hint" id="repairResult"></p>
       </div>
 
       <div class="card">
         <h2>Claude Code 連携</h2>
-        <p class="hint">Claude Codeでデモサイトを作ったとき、そのURLを案件番号の訪問先に自動で登録できます（初回だけCloudflareの設定が必要です。手順は管理者向けメモを参照）。</p>
+        <p class="hint">デモサイトを作ったとき、そのURLを案件番号の訪問先に自動で登録できます。<br>初回だけ、Cloudflareの設定が必要です（手順は管理者向けメモを参照）。</p>
         <div class="btn-row">
           <button class="btn" type="button" id="copyClaudeBatch">明日の訪問先のデモサイト作成をまとめて依頼（コピー）</button>
         </div>
