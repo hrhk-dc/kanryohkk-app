@@ -1,3 +1,0 @@
-# 現在は Cloudflare Pages で公開しています（このファイルは旧Netlify用の安全設定として残しています）
-[build]
-  publish = "public"
