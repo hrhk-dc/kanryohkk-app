@@ -700,7 +700,28 @@ function showTab(name) {
   if (name === "today") renderToday();
   if (name === "stats") renderStats();
   window.scrollTo(0, 0);
+  document.querySelector(".tabs")?.classList.remove("hide");
 }
+// 下にスクロールで下のタブを隠し、上にスクロールで出す
+(() => {
+  const nav = document.querySelector(".tabs");
+  if (!nav) return;
+  let lastY = window.scrollY, ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const y = Math.max(0, window.scrollY);
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const dy = y - lastY;
+      if (y < 40 || y >= max - 4) nav.classList.remove("hide"); // 一番上・一番下では出す
+      else if (dy > 8) nav.classList.add("hide");
+      else if (dy < -8) nav.classList.remove("hide");
+      if (Math.abs(dy) > 8) lastY = y;
+      ticking = false;
+    });
+  }, { passive: true });
+})();
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
   if ((t.dataset.tab === "admin" || t.dataset.tab === "stats") && !isAdmin()) return;
   showTab(t.dataset.tab);
