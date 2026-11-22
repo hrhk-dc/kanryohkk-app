@@ -595,3 +595,22 @@ input:focus, select:focus, textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* 集計：棒グラフと数字を1行に並べる／数字を縦に割らない */
+.st-vis { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.st-vis .bar { margin-right: 0; flex: none; }
+.st-row span, .st-head span { white-space: nowrap; }
+.st-row .st-key { white-space: normal; }
+.stats-pick select, .stats-pick input { min-width: 0; }
+
+/* 日付欄が右にはみ出さないようにする（iPhoneのSafariは日付欄が幅を超えやすい） */
+input[type="date"], input[type="month"], input[type="time"] {
+  -webkit-appearance: none; appearance: none;
+  min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box;
+  text-align: left; overflow: hidden;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-date-and-time-value { text-align: left; min-width: 0; margin: 0; }
+.filter-row > label { flex: 1 1 150px; min-width: 0; max-width: 100%; }
+.filter-row > .btn-row { flex: 1 1 100%; }
+.stats-pick input[type="date"], .stats-pick input[type="month"] { width: auto; flex: 1 1 140px; }
+#schedDate, #visitDate, #visitFilterDate { max-width: 100%; }
