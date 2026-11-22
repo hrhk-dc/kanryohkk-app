@@ -146,7 +146,7 @@ const snap10 = (v) => {
 };
 
 /* ---------- 時刻ピッカー：スマホのアラーム設定と同じ、上下に回して選ぶ形（時・分は10分刻み） ---------- */
-const TS_H = 44; // 1行の高さ(px)。style.css の .ts-item と同じ値
+const TS_H = 30; // 1行の高さ(px)。style.css の .ts-item と同じ値
 const pad2 = (n) => String(n).padStart(2, "0");
 let tsDone = null, tsTouched = false;
 function tsEnsure() {
@@ -159,10 +159,9 @@ function tsEnsure() {
   el.setAttribute("aria-modal", "true");
   el.innerHTML = `<div class="ts-backdrop" data-ts="close"></div>
     <div class="ts-panel">
-      <div class="ts-grab"></div>
-      <div class="ts-head"><span></span><b id="tsTitle">時間を選ぶ</b><button type="button" class="ts-link" data-ts="close">閉じる</button></div>
+      <b class="ts-title" id="tsTitle">時間を選ぶ</b>
       <div class="ts-wheels"><div class="ts-mark"></div><div class="ts-col" id="tsH" aria-label="時"></div><span class="ts-colon">:</span><div class="ts-col" id="tsM" aria-label="分"></div></div>
-      <button type="button" class="btn ghost full" data-ts="clear">時間未定にする</button>
+      <div class="ts-foot"><button type="button" class="ts-link" data-ts="clear">時間未定にする</button><button type="button" class="ts-link" data-ts="close">閉じる</button></div>
     </div>`;
   document.body.appendChild(el);
   const fill = (col, vals) => { col.innerHTML = vals.map((v) => `<div class="ts-item" data-v="${v}">${v}</div>`).join(""); };
@@ -195,7 +194,16 @@ function tsEnsure() {
 }
 const tsIndex = (col) => Math.max(0, Math.min(col.children.length - 1, Math.round(col.scrollTop / TS_H)));
 const tsValue = (col) => col.children[tsIndex(col)].dataset.v;
-function tsMark(col) { [...col.children].forEach((c, i) => c.classList.toggle("on", i === tsIndex(col))); }
+// 選ばれていない数字ほど、小さく・薄く・奥に倒れて見えるようにする
+function tsMark(col) {
+  const pos = col.scrollTop / TS_H;
+  [...col.children].forEach((c, i) => {
+    const d = i - pos, k = Math.abs(d);
+    if (k > 3.5) { c.style.opacity = "0"; return; }
+    c.style.opacity = String(1 / (1 + 0.9 * k * k));
+    c.style.transform = `rotateX(${Math.max(-50, Math.min(50, -d * 14))}deg) scale(${Math.max(0.37, 1 - 0.4 * k)})`;
+  });
+}
 function tsSet(col, v) {
   const i = Math.max(0, [...col.children].findIndex((c) => c.dataset.v === v));
   col.scrollTop = i * TS_H;

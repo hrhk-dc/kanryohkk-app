@@ -649,36 +649,24 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 .time-btn.small { min-height: 34px; padding: 0 12px; font-size: 14px; border-radius: 12px; }
 .vtime .time-btn { margin-left: 4px; }
 
-/* 回転式ピッカー本体（下から出るシート） */
-.time-sheet { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; }
-.ts-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: tsFade .25s ease both; }
-.ts-panel {
-  position: relative; width: 100%; max-width: 520px; padding: 14px 18px calc(18px + env(safe-area-inset-bottom));
-  background: var(--card); border-radius: 28px 28px 0 0;
-  box-shadow: 0 -20px 60px rgba(0, 0, 0, .7), 0 1px 0 rgba(255, 255, 255, .1) inset;
-  animation: tsUp .35s var(--ease) both;
-}
-.ts-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 6px; }
-.ts-head b { font-size: 16px; }
-.ts-link { background: none; border: none; font: inherit; font-size: 15px; font-weight: 600; color: var(--muted); padding: 10px 4px; cursor: pointer; justify-self: start; }
-.ts-ok { color: var(--text); justify-self: end; }
-.ts-wheels { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; height: 220px; margin-bottom: 12px; }
-.ts-mark { position: absolute; left: 6%; right: 6%; top: 50%; height: 44px; margin-top: -22px; border-radius: 14px; background: var(--tile-hi); pointer-events: none; }
+/* 回転式ピッカー本体：画面の中央に出る、時と分だけの小さなカプセル枠。外側をタップ（または「閉じる」）で自動で入る */
+.time-sheet { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; }
+.ts-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: tsFade .25s ease both; }
+.ts-panel { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; animation: tsPop .3s var(--ease) both; }
+.ts-title { font-size: 11px; font-weight: 500; letter-spacing: .14em; color: var(--muted); }
+.ts-wheels { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 22px; height: 210px; }
+.ts-mark { position: absolute; left: 0; right: 0; top: 50%; height: 54px; margin-top: -27px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .05); pointer-events: none; }
 .ts-col {
-  position: relative; z-index: 1; width: 96px; height: 220px; overflow-y: auto; scroll-snap-type: y mandatory;
-  padding: 88px 0; box-sizing: border-box; scrollbar-width: none; overscroll-behavior: contain;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 32%, #000 68%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0, #000 32%, #000 68%, transparent 100%);
+  position: relative; z-index: 1; width: 48px; height: 210px; overflow-y: auto; scroll-snap-type: y mandatory;
+  padding: 90px 0; box-sizing: border-box; scrollbar-width: none; overscroll-behavior: contain; perspective: 240px;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30%, #000 70%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 30%, #000 70%, transparent 100%);
 }
 .ts-col::-webkit-scrollbar { display: none; }
-.ts-item { height: 44px; line-height: 44px; text-align: center; font-size: 26px; font-weight: 500; color: var(--faint); scroll-snap-align: center; cursor: pointer; font-variant-numeric: tabular-nums; transition: color .15s, font-weight .15s; }
-.ts-item.on { color: var(--text); font-weight: 700; }
-.ts-colon { position: relative; z-index: 1; font-size: 26px; font-weight: 700; padding-bottom: 2px; }
-@keyframes tsUp { from { transform: translateY(100%); } to { transform: none; } }
+.ts-item { height: 30px; line-height: 30px; text-align: center; font-size: 30px; font-weight: 500; letter-spacing: .02em; color: var(--text); scroll-snap-align: center; cursor: pointer; font-variant-numeric: tabular-nums; will-change: transform, opacity; }
+.ts-colon { position: relative; z-index: 1; font-size: 26px; font-weight: 500; padding-bottom: 3px; }
+.ts-foot { display: flex; gap: 22px; }
+.ts-link { background: none; border: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--muted); padding: 8px 4px; cursor: pointer; }
+.ts-link:hover { color: var(--text); }
+@keyframes tsPop { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes tsFade { from { opacity: 0; } to { opacity: 1; } }
-
-/* 時刻ピッカーをシンプルに：完了ボタンなし。回して外側をタップ（または「閉じる」）で自動で入る */
-.ts-grab { width: 40px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, .18); margin: 0 auto 8px; }
-.ts-head { margin-bottom: 2px; }
-.ts-head .ts-link { justify-self: end; }
-.time-sheet .btn.ghost.full { background: transparent; box-shadow: none; color: var(--muted); min-height: 40px; font-size: 14px; }
