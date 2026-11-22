@@ -1,7 +1,7 @@
 // Claude Codeで作ったデモサイトのURLを、案件番号ごとに保存・取得する（Cloudflare Pages Functions：/api/demo-url）
 //
 // 保存（Claude Codeから）：
-//   POST /api/demo-url  { "caseNo": "A012", "url": "https://xxx.netlify.app", "token": "合言葉" }
+//   POST /api/demo-url  { "caseNo": "A012", "url": "https://xxx.pages.dev", "token": "合言葉" }
 // 取得（アプリから・ログイン中のメンバーだけ）：
 //   GET  /api/demo-url  （Authorization: Bearer <FirebaseのIDトークン>）
 //

@@ -2624,7 +2624,7 @@ function renderAllExtras() {
 }
 
 
-/* ---------- Claude Codeで登録されたデモサイトURL（Netlify側に保存）を訪問先に付ける ---------- */
+/* ---------- Claude Codeで登録されたデモサイトURL（Cloudflare側に保存）を訪問先に付ける ---------- */
 // 保存した訪問先のGoogleマップのリンクを、デモサイト作成の依頼として預ける（Claude Codeが定期的に受け取って作る）
 async function queueDemos(list) {
   try {
