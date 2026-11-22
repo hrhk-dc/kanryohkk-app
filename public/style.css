@@ -676,3 +676,9 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 .ts-colon { position: relative; z-index: 1; font-size: 26px; font-weight: 700; padding-bottom: 2px; }
 @keyframes tsUp { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes tsFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 時刻ピッカーをシンプルに：完了ボタンなし。回して外側をタップ（または「閉じる」）で自動で入る */
+.ts-grab { width: 40px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, .18); margin: 0 auto 8px; }
+.ts-head { margin-bottom: 2px; }
+.ts-head .ts-link { justify-self: end; }
+.time-sheet .btn.ghost.full { background: transparent; box-shadow: none; color: var(--muted); min-height: 40px; font-size: 14px; }
