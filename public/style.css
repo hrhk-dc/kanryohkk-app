@@ -626,3 +626,11 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 .stat-table.daily .st-head span:first-child, .stat-table.daily .st-row span:first-child {
   position: sticky; left: 0; z-index: 1; background: var(--card); padding-right: 6px;
 }
+
+/* 日報（数字）：年・日付の選択 */
+.daily-pick { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; align-items: end; margin: 4px 0 4px; }
+.daily-pick label { margin: 0; font-size: 12px; color: var(--muted); min-width: 0; }
+.daily-pick select { padding: 11px 30px 11px 13px; font-size: 15px; background-position: right 10px center; }
+.daily-pick .btn { min-height: 44px; }
+#dailyRange { margin: 6px 2px 10px; }
+@media (max-width: 480px) { .daily-pick { grid-template-columns: 96px 1fr; } .daily-pick .btn { grid-column: 1 / -1; } }
