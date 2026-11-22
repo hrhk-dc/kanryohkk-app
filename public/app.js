@@ -164,16 +164,26 @@ function tsEnsure() {
       <div class="ts-foot"><button type="button" class="ts-link" data-ts="clear">時間未定にする</button><button type="button" class="ts-link" data-ts="close">閉じる</button></div>
     </div>`;
   document.body.appendChild(el);
-  const fill = (col, vals) => { col.innerHTML = vals.map((v) => `<div class="ts-item" data-v="${v}">${v}</div>`).join(""); };
+  // 何周でも回せるように、同じ並びを奇数回くり返して並べ、真ん中のかたまりに戻しながら使う
+  const fill = (col, vals) => {
+    const copies = Math.ceil(144 / vals.length) | 1;
+    col._n = vals.length; col._copies = copies; col._r = null;
+    col.innerHTML = Array.from({ length: copies }, () => vals.map((v) => `<div class="ts-item" data-v="${v}">${v}</div>`).join("")).join("");
+  };
   fill(el.querySelector("#tsH"), Array.from({ length: 24 }, (_, i) => pad2(i)));
   fill(el.querySelector("#tsM"), Array.from({ length: 6 }, (_, i) => pad2(i * 10)));
   el.querySelectorAll(".ts-col").forEach((col) => {
-    let tick = false;
+    let tick = false, idle = 0;
     // 指で触ったときだけ「変更あり」にする（開いた直後の自動スクロールは変更にしない）
     ["pointerdown", "wheel", "touchstart"].forEach((ev) => col.addEventListener(ev, () => { tsTouched = true; }, { passive: true }));
     col.addEventListener("scroll", () => {
-      if (tick) return; tick = true;
-      requestAnimationFrame(() => { tsMark(col); tick = false; });
+      if (!tick) { tick = true; requestAnimationFrame(() => { tsMark(col); tick = false; }); }
+      // 止まったら、見た目が同じ真ん中のかたまりに静かに戻す（端に着かないように）
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        const n = col._n, mid = (col._copies - 1) / 2, i = tsIndex(col);
+        if (i < (mid - 1) * n || i >= (mid + 2) * n) { col.scrollTop = (mid * n + (((i % n) + n) % n)) * TS_H; tsMark(col); }
+      }, 160);
     }, { passive: true });
     col.addEventListener("click", (e) => {
       const it = e.target.closest(".ts-item");
@@ -196,17 +206,21 @@ const tsIndex = (col) => Math.max(0, Math.min(col.children.length - 1, Math.roun
 const tsValue = (col) => col.children[tsIndex(col)].dataset.v;
 // 選ばれていない数字ほど、小さく・薄く・奥に倒れて見えるようにする
 function tsMark(col) {
-  const pos = col.scrollTop / TS_H;
-  [...col.children].forEach((c, i) => {
-    const d = i - pos, k = Math.abs(d);
-    if (k > 3.5) { c.style.opacity = "0"; return; }
+  const pos = col.scrollTop / TS_H, last = col.children.length - 1;
+  if (col._r) for (let i = col._r[0]; i <= col._r[1]; i++) col.children[i].style.opacity = "0"; // 前に見えていた行を一度消す
+  const lo = Math.max(0, Math.floor(pos) - 4), hi = Math.min(last, Math.ceil(pos) + 4);
+  for (let i = lo; i <= hi; i++) {
+    const c = col.children[i], d = i - pos, k = Math.abs(d);
+    if (k > 3.5) continue;
     c.style.opacity = String(1 / (1 + 0.9 * k * k));
     c.style.transform = `rotateX(${Math.max(-50, Math.min(50, -d * 14))}deg) scale(${Math.max(0.37, 1 - 0.4 * k)})`;
-  });
+  }
+  col._r = [lo, hi];
 }
 function tsSet(col, v) {
-  const i = Math.max(0, [...col.children].findIndex((c) => c.dataset.v === v));
-  col.scrollTop = i * TS_H;
+  const n = col._n, mid = (col._copies - 1) / 2;
+  const i = Math.max(0, [...col.children].slice(0, n).findIndex((c) => c.dataset.v === v));
+  col.scrollTop = (mid * n + i) * TS_H;
   tsMark(col);
 }
 function tsClose() {
