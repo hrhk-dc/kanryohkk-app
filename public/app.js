@@ -702,9 +702,11 @@ function showTab(name) {
   window.scrollTo(0, 0);
   document.querySelector(".tabs")?.classList.remove("hide");
 }
-// 下にスクロールで下のタブを隠し、上にスクロールで出す
+// 下にスクロールで下のタブを隠し、上にスクロールで出す（一番下に着いても隠れたまま）
+// 上のバーは、下にスクロールしたら隠し、一番上に戻ったときだけ出す
 (() => {
   const nav = document.querySelector(".tabs");
+  const top = document.querySelector(".topbar");
   if (!nav) return;
   let lastY = window.scrollY, ticking = false;
   window.addEventListener("scroll", () => {
@@ -714,7 +716,9 @@ function showTab(name) {
       const y = Math.max(0, window.scrollY);
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const dy = y - lastY;
-      if (y < 40 || y >= max - 4) nav.classList.remove("hide"); // 一番上・一番下では出す
+      top?.classList.toggle("hide", y > 24);
+      if (y < 40) nav.classList.remove("hide"); // 一番上では出す
+      else if (y >= max - 4) { /* 一番下では今の状態のまま（出さない） */ }
       else if (dy > 8) nav.classList.add("hide");
       else if (dy < -8) nav.classList.remove("hide");
       if (Math.abs(dy) > 8) lastY = y;

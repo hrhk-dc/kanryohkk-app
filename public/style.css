@@ -614,3 +614,7 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 .filter-row > .btn-row { flex: 1 1 100%; }
 .stats-pick input[type="date"], .stats-pick input[type="month"] { width: auto; flex: 1 1 140px; }
 #schedDate, #visitDate, #visitFilterDate { max-width: 100%; }
+
+/* 上のバー：下にスクロールしたら隠れ、一番上に戻ったときだけ出る */
+.topbar { transition: transform .3s var(--ease), opacity .3s ease; }
+.topbar.hide { transform: translateY(-110%); opacity: 0; pointer-events: none; }
