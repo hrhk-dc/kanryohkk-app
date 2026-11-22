@@ -2473,7 +2473,7 @@ function statTable(rows, keyLabel) {
   const maxV = Math.max(1, ...rows.map((r) => r.visits));
   return `<div class="stat-table"><div class="st-head"><span>${keyLabel}</span><span>訪問</span><span>報告</span><span>成約</span><span>成約率</span></div>` +
     rows.map((r) => `<div class="st-row"><span class="st-key">${esc(r.key)}</span>
-      <span><i class="bar" style="width:${Math.round((r.visits / maxV) * 60)}px"></i>${r.visits}</span>
+      <span class="st-vis"><i class="bar" style="width:${Math.round((r.visits / maxV) * 36)}px"></i>${r.visits}</span>
       <span>${r.reports}</span><span class="st-won">${r.won}</span>
       <span>${r.reports ? Math.round((r.won / r.reports) * 100) : 0}%</span></div>`).join("") + "</div>";
 }
@@ -2520,7 +2520,8 @@ function renderStats() {
   const won = (r) => itemVal(r.items, "result") === "成約";
   const group = (keyV, keyR) => {
     const m = {};
-    const g = (k) => (m[k] ||= { key: k, visits: 0, reports: 0, won: 0 });
+    // 「山田 太郎」と「山田太郎」のように空白だけ違う名前は同じ人として数える
+    const g = (k) => (m[k.replace(/[\s　]+/g, "")] ||= { key: k, visits: 0, reports: 0, won: 0 });
     vs.forEach((v) => g(keyV(v) || "（未設定）").visits++);
     rs.forEach((r) => { const x = g(keyR(r) || "（未設定）"); x.reports++; if (won(r)) x.won++; });
     return Object.values(m).sort((a, b) => b.won - a.won || b.reports - a.reports || b.visits - a.visits);
