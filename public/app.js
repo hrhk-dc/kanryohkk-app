@@ -148,7 +148,7 @@ const snap10 = (v) => {
 /* ---------- 時刻ピッカー：スマホのアラーム設定と同じ、上下に回して選ぶ形（時・分は10分刻み） ---------- */
 const TS_H = 44; // 1行の高さ(px)。style.css の .ts-item と同じ値
 const pad2 = (n) => String(n).padStart(2, "0");
-let tsDone = null;
+let tsDone = null, tsTouched = false;
 function tsEnsure() {
   let el = document.getElementById("timeSheet");
   if (el) return el;
@@ -157,9 +157,10 @@ function tsEnsure() {
   el.className = "time-sheet overlay hidden";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-modal", "true");
-  el.innerHTML = `<div class="ts-backdrop" data-ts="cancel"></div>
+  el.innerHTML = `<div class="ts-backdrop" data-ts="close"></div>
     <div class="ts-panel">
-      <div class="ts-head"><button type="button" class="ts-link" data-ts="cancel">キャンセル</button><b id="tsTitle">時間を選ぶ</b><button type="button" class="ts-link ts-ok" data-ts="ok">完了</button></div>
+      <div class="ts-grab"></div>
+      <div class="ts-head"><span></span><b id="tsTitle">時間を選ぶ</b><button type="button" class="ts-link" data-ts="close">閉じる</button></div>
       <div class="ts-wheels"><div class="ts-mark"></div><div class="ts-col" id="tsH" aria-label="時"></div><span class="ts-colon">:</span><div class="ts-col" id="tsM" aria-label="分"></div></div>
       <button type="button" class="btn ghost full" data-ts="clear">時間未定にする</button>
     </div>`;
@@ -169,6 +170,8 @@ function tsEnsure() {
   fill(el.querySelector("#tsM"), Array.from({ length: 6 }, (_, i) => pad2(i * 10)));
   el.querySelectorAll(".ts-col").forEach((col) => {
     let tick = false;
+    // 指で触ったときだけ「変更あり」にする（開いた直後の自動スクロールは変更にしない）
+    ["pointerdown", "wheel", "touchstart"].forEach((ev) => col.addEventListener(ev, () => { tsTouched = true; }, { passive: true }));
     col.addEventListener("scroll", () => {
       if (tick) return; tick = true;
       requestAnimationFrame(() => { tsMark(col); tick = false; });
@@ -181,10 +184,11 @@ function tsEnsure() {
   el.addEventListener("click", (e) => {
     const act = e.target.closest("[data-ts]")?.dataset.ts;
     if (!act) return;
-    const done = tsDone;
+    // 「完了」は不要：閉じたとき（外側をタップ／閉じる）に、回した時刻が自動で入る
+    const done = tsDone, touched = tsTouched;
     const val = `${tsValue(el.querySelector("#tsH"))}:${tsValue(el.querySelector("#tsM"))}`;
     tsClose();
-    if (act === "ok" && done) done(val);
+    if (act === "close" && done && touched) done(val);
     if (act === "clear" && done) done("");
   });
   return el;
@@ -204,7 +208,7 @@ function tsClose() {
 }
 function openTimePicker({ value, title, onDone }) {
   const el = tsEnsure();
-  tsDone = onDone;
+  tsDone = onDone; tsTouched = false;
   el.querySelector("#tsTitle").textContent = title || "時間を選ぶ";
   el.classList.remove("hidden");
   document.body.style.overflow = "hidden";
