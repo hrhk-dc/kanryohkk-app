@@ -827,3 +827,177 @@ label { color: var(--sub); }
 /* 黄色の注意は、枠を薄く残す程度に抑える */
 .dup-alert { border-radius: 16px; }
 @media (prefers-reduced-motion: reduce) { .tab.active svg { transition: none; } }
+
+/* =====================================================
+   ラウンド2（全画面の統一）：ガラス＋シアン→バイオレット→マゼンタの柔らかい光。
+   違いは「光」だけ。金色・紫の文字・青い下線・白地の大きな面は使わない。
+   ここから下が最終の決まり（上の同じ部品より後ろなので優先される）。
+   ===================================================== */
+:root {
+  --ring-soft: linear-gradient(135deg, rgba(0, 229, 255, .5), rgba(124, 92, 255, .5) 52%, rgba(255, 46, 136, .5));
+  --ring-danger: linear-gradient(135deg, rgba(255, 90, 95, .55), rgba(255, 90, 95, .22));
+  --aurora-fill: linear-gradient(135deg, rgba(0, 229, 255, .62), rgba(124, 92, 255, .7) 52%, rgba(255, 46, 136, .66));
+  --coral-soft: #ff9fa3;
+  --nav-idle: #8d9bb0;
+  --yellow: #e6eaf2;   /* 金色は使わない。注意は銀白で表す */
+  --ring-fill: #1a1c23; /* 細い枠のピルの中の塗り（透けると枠の色が広がるので不透明に近くする） */
+}
+a { color: var(--sub); text-decoration: none; }
+a:hover { color: var(--text); }
+::selection { background: rgba(0, 229, 255, .3); }
+.link-btn, .link-btn:hover { color: var(--sub); }
+.link-btn:hover { color: var(--text); }
+
+/* ----- ボタン：すべて完全なピル。線画アイコンつき ----- */
+.btn, .btn.small, .btn.ghost {
+  border-radius: 999px; min-height: 40px;
+  background: var(--tile); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--glass-line);
+}
+.btn.small { min-height: 34px; padding: 7px 14px; font-size: 14px; }
+.btn:hover { background: var(--tile-hi); }
+.btn .ic, .btn.small .ic { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
+/* 複写・編集・削除のボタンには、線画アイコンを CSS で付ける（アイコンが無いボタンだけ） */
+.btn[data-copy]:not(:has(> .ic))::before, .btn[data-copy-field]::before,
+.btn[data-edit]::before, .btn[data-vedit]::before,
+.btn[data-del]::before, .btn[data-vdel]::before, .btn[data-remove]::before {
+  content: ""; display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px;
+  background: currentColor; flex: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='12' height='12' rx='3'/%3E%3Cpath d='M16 8V6.5A2.5 2.5 0 0013.5 4h-7A2.5 2.5 0 004 6.5v7A2.5 2.5 0 006.5 16H8'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='12' height='12' rx='3'/%3E%3Cpath d='M16 8V6.5A2.5 2.5 0 0013.5 4h-7A2.5 2.5 0 004 6.5v7A2.5 2.5 0 006.5 16H8'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+}
+.btn[data-edit]::before, .btn[data-vedit]::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l4.5-1 10-10a2.1 2.1 0 00-3-3l-10 10L4 20zM13.5 6.5l3 3'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l4.5-1 10-10a2.1 2.1 0 00-3-3l-10 10L4 20zM13.5 6.5l3 3'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+}
+.btn[data-del]::before, .btn[data-vdel]::before, .btn[data-remove]::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.5h9l1-12.5'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.5h9l1-12.5'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+}
+/* メインの操作（保存する・報告する）：シアン→マゼンタの柔らかい光のピル＋白文字 */
+.btn.primary, .btn.primary:hover, .visit-item .btn.primary, .visit-item .btn.primary:hover, .mini-row .btn.primary, .mini-row .btn.primary:hover {
+  background: var(--aurora-fill); border: 0; color: #fff; font-weight: 700;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 22px -10px rgba(255, 46, 136, .5);
+}
+/* 削除：ベタの赤ではなく、ガラスに細い柔らかい赤い枠 */
+.btn.danger, .visit-item .btn.danger, .mini-row .btn.danger {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-danger) border-box;
+  border: 1px solid transparent; color: var(--coral-soft); box-shadow: none;
+}
+.btn.danger:hover { background: linear-gradient(var(--tile-hi), var(--tile-hi)) padding-box, var(--ring-danger) border-box; }
+/* 訪問予定時刻の選んだ後：グラデーション枠線 */
+.time-btn { border-radius: 999px; background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.time-btn:not(.empty-val) { background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box; border: 1px solid transparent; box-shadow: none; }
+.time-btn.empty-val { color: var(--sub); }
+/* マップから読み取り直す：全幅のガラスのピル＋細いグラデーション枠 */
+.btn[data-relookup] {
+  width: 100%; justify-content: center;
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box; border: 1px solid transparent; box-shadow: none;
+}
+/* 以前訪問済みの警告：金色をやめ、柔らかいガラスの帯＋細い枠 */
+.dup-alert, .notice, .notice.warn, .notice.warn-box, .req-box, .bulk-box {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box;
+  border: 1px solid transparent; box-shadow: none; color: var(--sub);
+}
+.dup-alert { font-weight: 500; border-radius: 16px; }
+.dup-alert .ic { color: var(--text); }
+.notice code { color: var(--text); }
+.bulk-box summary, .bulk-label { color: var(--text); }
+.bulk-box textarea { background: rgba(0, 0, 0, .3); }
+.req-box > b { color: var(--text); }
+.warn-text { color: var(--coral-soft); }
+.dup-warn, .lookup-status.dup { color: var(--sub); }
+.lookup-status.ok, .case-hit { color: var(--sub); }
+.lookup-status.ng { color: var(--coral-soft); }
+/* 「読み取った内容を確認・修正」「詳細を表示」：紫の文字をやめ、白70％ */
+.row-more > summary, .report-details summary, .row-more > summary:hover, .report-details summary:hover { color: var(--sub); }
+.row-card .row-no, .case-card.multi .row-card-head span, .na-line strong, .details-sub { color: var(--sub); }
+.error-box .err-row b, .error-box .err-title { color: var(--coral-soft); }
+
+/* ----- 報告一覧・訪問リストのカード ----- */
+.report-card .btn, .visit-item .btn, .mini-row .btn { border-radius: 999px; }
+.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger) { background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+/* デモURLの文字：白70％、きれいに折り返す */
+.demo-url-link, .report-card .demo-url-link {
+  color: var(--sub); text-decoration: none; word-break: normal; overflow-wrap: anywhere; min-width: 0; flex: 1 1 160px; text-align: left;
+}
+.na-box { background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box; border: 1px solid transparent; box-shadow: none; }
+/* 成約・報告済み・成功のラベル：ベタの緑をやめ、同じ言語（ガラス＋細い枠） */
+.lc-won, .badge.ok, .badge.st-done, .badge.st-done.ok, .auto-tag {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box;
+  border: 1px solid transparent; color: var(--text); box-shadow: none;
+}
+.lc-won .ic { color: var(--text); }
+.lc-won b { color: var(--text); }
+/* 未報告・検討中の黄色は、銀白の文字＋細い枠 */
+.badge.wait, .badge.st-todo, .badge.st-done.wait, .due.now {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box;
+  border: 1px solid transparent; color: var(--text); box-shadow: none;
+}
+.badge.gray, .badge.st-done.gray { background: var(--tile); color: var(--sub); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.badge.ng, .badge.st-done.ng, .due.over {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-danger) border-box;
+  border: 1px solid transparent; color: var(--coral-soft); box-shadow: none;
+}
+.tag.cat { background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box; border: 1px solid transparent; color: var(--text); box-shadow: none; }
+.tag.none { background: transparent; color: var(--faint); box-shadow: inset 0 0 0 1px var(--glass-line); }
+
+/* ----- 集計の数字 ----- */
+.stats-summary div, .stats-summary div:nth-child(1), .stats-summary div:nth-child(2), .stats-summary div:nth-child(3), .stats-summary div:nth-child(4) {
+  color: var(--text); box-shadow: inset 0 0 0 1px var(--line); background: var(--tile);
+}
+.stats-summary div::after { background: var(--aurora); }
+.stats-summary .st-won b, .st-won { color: var(--text); }
+.bar { background: var(--aurora); }
+
+/* ----- 担当者の切り替え（件数） ----- */
+.pc-chip b, .pc-chip.active b { color: var(--text); }
+.pc-chip.active { background: var(--aurora-soft); color: var(--text); }
+.person-counts { background: var(--tile); box-shadow: inset 0 0 0 1px var(--glass-line); }
+
+/* ----- 入力欄・チェックボックス（旧いものを統一） ----- */
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(0, 229, 255, .7);
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, .16), inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+input, select, textarea { border: 1px solid var(--line); }
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; flex: none;
+  width: 20px; min-width: 20px; height: 20px; margin: 0; padding: 0; border-radius: 7px;
+  background-color: var(--tile); box-shadow: inset 0 0 0 1px var(--glass-line); cursor: pointer;
+}
+input[type="checkbox"]:checked {
+  background-color: transparent;
+  background-size: 14px 14px; background-position: center; background-repeat: no-repeat;
+  box-shadow: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 10.5l3.2 3.2L15 6.8'/%3E%3C/svg%3E"), var(--aurora-fill);
+}
+input[type="checkbox"]:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0, 229, 255, .35); }
+input[type="checkbox"]:disabled { opacity: .4; }
+.check input[type="checkbox"] { width: 20px; }
+
+/* ----- 空の状態 ----- */
+.empty { color: var(--sub); }
+.empty .ic.ok { color: var(--text); }
+.rows-empty { color: var(--sub); border: 1px dashed var(--glass-line); border-radius: 20px; }
+.empty .ic { color: var(--sub); }
+
+/* ----- 下のタブ（ナビ）：ガラスのピル＋細いグラデーションの縁。
+   アーチ（選ばれたタブの上のなだらかな盛り上がり）と DC ロゴの丸いボタンは未実装＝Sonnet タスク。
+   実装の場所：この .tabs の中に、選ばれたタブごとに SVG の輪郭（高さ約10px、裾はタブ幅の約2倍）を置く。 */
+.tabs {
+  background: linear-gradient(var(--glass), var(--glass)) padding-box, var(--ring-soft) border-box;
+  border: 1.1px solid transparent; border-radius: 999px;
+}
+.tab { color: var(--nav-idle); }
+.tab.active { color: #cfeff7; }
+.tab.active::after {
+  content: ""; width: 4px; height: 4px; border-radius: 50%; margin-top: -1px;
+  background: var(--aurora); box-shadow: 0 0 6px rgba(0, 229, 255, .8);
+}
+.tab svg { color: var(--nav-idle); }
+.tab.active svg { color: #eafcff; }
+
+/* ----- ライトの色（切り替えはまだない） ----- */
+:root[data-theme="light"] { --nav-idle: #5b6578; --yellow: #3a4150; --coral-soft: #d4383d; }

@@ -127,7 +127,8 @@ const ICON_PATHS = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6.5A2.5 2.5 0 0013.5 4h-7A2.5 2.5 0 004 6.5v7A2.5 2.5 0 006.5 16H8"/>',
   link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
   logout: '<path d="M14 4.5h3.5a2 2 0 012 2v11a2 2 0 01-2 2H14M10 16l4-4-4-4M14 12H4"/>',
-  download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>'
+  download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
+  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>'
 };
 const ic = (name, cls = "") => `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] || ""}</svg>`;
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -855,7 +856,7 @@ function fieldInput(f, value = "") {
     case "maps": return `<input type="url" ${attrs} placeholder="https://maps.app.goo.gl/..." value="${esc(value)}">
       <div class="btn-row">
         <button class="btn small" type="button" data-copy-field="url">URLをコピー</button>
-        <button class="btn small" type="button" data-copy-field="claude">Claude Code用の指示をコピー</button>
+        <button class="btn small" type="button" data-copy-field="claude">${ic("code")}Claude Code用の指示をコピー</button>
       </div>`;
     case "date": return `<input type="date" ${attrs} value="${esc(value)}">`;
     case "datetime": return `<input type="datetime-local" ${attrs} value="${esc(value)}">`;
@@ -973,7 +974,7 @@ function valueHtml(i) {
     return `<a href="${esc(i.value)}" target="_blank" rel="noopener">${esc(i.value)}</a>
       <div class="btn-row">
         <button class="btn small" type="button" data-copy="${esc(i.value)}">URLをコピー</button>
-        <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(i.value))}">Claude Code用の指示をコピー</button>
+        <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(i.value))}">${ic("code")}Claude Code用の指示をコピー</button>
       </div>`;
   }
   if (i.type === "photo") return `<span class="ph-list">${photoThumbs(String(i.value).split(","))}</span>`;
@@ -1254,7 +1255,7 @@ function renderList() {
         ${naMaps ? `<div class="btn-row">
           <a class="btn small" href="${esc(naMaps)}" target="_blank" rel="noopener">地図を開く</a>
           <button class="btn small" type="button" data-copy="${esc(naMaps)}">URLをコピー</button>
-          <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(naMaps))}">Claude Code用の指示をコピー</button>
+          <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(naMaps))}">${ic("code")}Claude Code用の指示をコピー</button>
         </div>` : ""}
       </div>` : "";
 
