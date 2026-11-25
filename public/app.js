@@ -2235,7 +2235,7 @@ function visitMiniHtml(v, opts = {}) {
   const time = (v.items || []).find((i) => i.type === "time" && i.value)?.value;
   return `<div class="mini-row">
     <div class="mini-main">
-      <div class="mini-title">${time ? `<b>${esc(fmtHour(time))}</b> ` : ""}${v.caseNo ? `<span class="case-no">${esc(v.caseNo)}</span> ` : ""}${esc(shopOf(v) || "（店舗名なし）")}</div>
+      <div class="mini-title">${time ? `<b>${esc(fmtHour(time))}</b> ` : ""}${v.caseNo ? `<span class="case-no">${esc(v.caseNo)}</span>` : ""}<span class="mini-shop">${esc(shopOf(v) || "（店舗名なし）")}</span></div>
       <div class="mini-sub">${[opts.showDate && fmtDateJa(v.visitDate), placeOf(v), industryOf(v), personOf(v)].filter(Boolean).map(esc).join(" · ")}</div>
     </div>
     <div class="btn-row" style="margin:0">${st.html}
