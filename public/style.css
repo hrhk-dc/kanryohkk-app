@@ -836,7 +836,7 @@ label { color: var(--sub); }
 :root {
   --ring-soft: linear-gradient(135deg, rgba(0, 229, 255, .5), rgba(124, 92, 255, .5) 52%, rgba(255, 46, 136, .5));
   --ring-danger: linear-gradient(135deg, rgba(255, 90, 95, .55), rgba(255, 90, 95, .22));
-  --aurora-fill: linear-gradient(135deg, rgba(0, 229, 255, .62), rgba(124, 92, 255, .7) 52%, rgba(255, 46, 136, .66));
+  --aurora-fill: linear-gradient(135deg, rgba(58, 158, 190, .56), rgba(98, 84, 190, .6) 52%, rgba(186, 64, 128, .54)); /* 彩度・明度を下げ、ガラス越しのにじむ光に */
   --coral-soft: #ff9fa3;
   --nav-idle: #8d9bb0;
   --yellow: #e6eaf2;   /* 金色は使わない。注意は銀白で表す */
@@ -984,8 +984,7 @@ input[type="checkbox"]:disabled { opacity: .4; }
 .empty .ic { color: var(--sub); }
 
 /* ----- 下のタブ（ナビ）：ガラスのピル＋細いグラデーションの縁。
-   アーチ（選ばれたタブの上のなだらかな盛り上がり）と DC ロゴの丸いボタンは未実装＝Sonnet タスク。
-   実装の場所：この .tabs の中に、選ばれたタブごとに SVG の輪郭（高さ約10px、裾はタブ幅の約2倍）を置く。 */
+   アーチと DC ロゴの丸いボタンは、ファイル末尾の「ナビのアーチ」ブロックで実装済み。 */
 .tabs {
   background: linear-gradient(var(--glass), var(--glass)) padding-box, var(--ring-soft) border-box;
   border: 1.1px solid transparent; border-radius: 999px;
@@ -1001,3 +1000,64 @@ input[type="checkbox"]:disabled { opacity: .4; }
 
 /* ----- ライトの色（切り替えはまだない） ----- */
 :root[data-theme="light"] { --nav-idle: #5b6578; --yellow: #3a4150; --coral-soft: #d4383d; }
+
+/* =====================================================
+   ナビのアーチ：ピル全体と選択タブの低い丘は、1本のSVGの輪郭（app.js の drawNav）。
+   丘は高さ約10px、裾は約2タブ分。縁は1.1pxのグラデーションで途切れず一周する。
+   ===================================================== */
+:root { --nav-fill-top: #111a2c; --nav-fill-bot: #080b14; }
+:root[data-theme="light"] { --nav-fill-top: #ffffff; --nav-fill-bot: #eef1f7; }
+.tabs {
+  height: 72px; padding: 0 18px 0 0; gap: 0; align-items: stretch; justify-content: flex-start;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.tabs.kb-hide { transform: translateY(calc(100% + 40px + env(safe-area-inset-bottom))); opacity: 0; pointer-events: none; }
+.navbg {
+  position: absolute; left: 0; top: -24px; width: 100%; height: calc(100% + 24px);
+  overflow: visible; pointer-events: none;
+  filter: drop-shadow(0 14px 26px rgba(0, 0, 0, .5));
+}
+/* 左端：くぼんだ丸いロゴボタン */
+.nav-logo {
+  position: relative; z-index: 1; flex: none; align-self: center;
+  width: 44px; height: 44px; margin: 0 4px 0 7px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, .06), rgba(0, 0, 0, .35));
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, .65), inset 0 -1px 0 rgba(255, 255, 255, .1), 0 0 0 1px rgba(255, 255, 255, .06);
+}
+.tab {
+  position: relative; z-index: 1; flex: 1 1 0; min-width: 0; min-height: 48px;
+  justify-content: flex-end; gap: 0; padding: 0 0 11px; border-radius: 0; background: none;
+  font-size: 10px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2;
+  color: rgba(159, 184, 219, .7);
+  -webkit-tap-highlight-color: transparent;
+}
+.tab:active { transform: scale(.96); }
+.tab svg { order: 0; width: 23px; height: 23px; margin-bottom: 3px; color: #8fa8c8; stroke-width: 1.5; transition: transform .25s var(--ease), color .25s, filter .25s; }
+.tab span { order: 2; }
+.tab::after { order: 1; content: ""; width: 5px; height: 5px; margin: 0 0 3px; border-radius: 50%; opacity: 0; transform: scale(.4);
+  background: #cdeeff; box-shadow: 0 0 6px rgba(120, 210, 255, .95), 0 0 13px rgba(120, 200, 255, .45); transition: opacity .25s, transform .25s; }
+.tab.active { color: #e9f6ff; font-weight: 700; background: none; box-shadow: none; }
+.tab.active svg { color: #e2f3ff; transform: translateY(-9px); filter: drop-shadow(0 0 7px rgba(130, 205, 255, .6)); }
+.tab.active::after { opacity: 1; transform: translateY(-9px) scale(1); margin-top: 0; }
+:root[data-theme="light"] .tab { color: #5b6578; }
+:root[data-theme="light"] .tab.active, :root[data-theme="light"] .tab.active svg { color: #0b2a4a; }
+
+/* 人物チップ：選択中も紫のベタ塗りにせず、ダークガラス＋柔らかいグラデーションの光だけ */
+.pc-chip, .pc-chip.active { background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.pc-chip.active {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-soft) border-box;
+  border: 1px solid transparent; box-shadow: 0 0 16px -6px rgba(124, 92, 255, .4);
+}
+
+/* 低スペック端末・透明効果を減らす設定：ぼかしをやめ、半透明のベタ塗りにする */
+html.lowfx *, html.lowfx *::before, html.lowfx *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html.lowfx .navbg { filter: none; }
+html.lowfx #pullIndicator, html.lowfx .toast { background: rgba(24, 27, 40, .96); }
+html.lowfx .ts-backdrop { background: rgba(0, 0, 0, .78); }
+@media (prefers-reduced-transparency: reduce) {
+  *, *::before, *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .navbg { filter: none; }
+}
+@media (prefers-reduced-motion: reduce) { .tab svg, .tab::after { transition: none; } }
