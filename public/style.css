@@ -1500,3 +1500,34 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
   padding: 0; margin: 0 4px 0 0; border-radius: 0;
   font-size: 15px; font-weight: 700; color: var(--text);
 }
+
+/* ================================================================
+   Round 13（v66）：390px の読みやすさ修正（見た目だけ。データ・機能・権限は変えない）
+   1. 報告カードの数値メタ行（資金力・説明・必要性・担当・受付）：項目は切らず、項目の単位で折り返す。
+      1項目＝1つのグレーのピル（縮めない・隠さない）。Round 7 の「2行にしない」は、5項目が
+      390px の1行に入らないため改訂（DESIGN.md の Round 13 を参照）。
+   2. 統計の日別表（390px）：はみ出していた列を幅に収める（横スクロールをなくす）。
+   3. 統計の月・日の入力欄：1行を占めて文字が切れないようにする（前後の矢印・今に戻る は次の行）。
+   4. ボタンの文字：日本語の途中で折らない（「番号をコ／ピー」のような折り返しを防ぐ）。
+   ================================================================ */
+.report-meta .report-meta-row.num-row { flex-wrap: wrap; gap: 6px; }
+.report-meta .report-meta-row.num-row > .meta-item { flex: 0 0 auto; min-width: auto; overflow: visible; white-space: nowrap; }
+@media (max-width: 480px) {
+  .report-meta .report-meta-row.num-row > .meta-item { font-size: 12px; padding: 3px 8px 3px 6px; }
+  .report-meta .report-meta-row.num-row .ic { width: 13px; height: 13px; }
+}
+
+.stat-table.daily { min-width: 0 !important; }
+@media (max-width: 480px) {
+  .stat-table.daily .st-head, .stat-table.daily .st-row { grid-template-columns: 64px repeat(6, minmax(0, 1fr)); gap: 2px; font-size: 12px; }
+  .stat-table.daily .st-head span, .stat-table.daily .st-row span { overflow: hidden; text-overflow: clip; }
+  .stat-table.daily .st-row span:first-child { white-space: nowrap; }
+}
+
+@media (max-width: 480px) {
+  .stats-pick > input[type="date"], .stats-pick > input[type="month"], .stats-pick > select, .stats-pick > #statsRangeText {
+    order: -1; flex: 1 1 100%; width: 100%; min-width: 0;
+  }
+}
+
+.btn { word-break: keep-all; }
