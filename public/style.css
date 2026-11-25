@@ -1141,3 +1141,100 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 14px rgba(0, 229, 255, .55), 0 0 22px rgba(255, 46, 136, .4);
   text-shadow: 0 0 10px rgba(255, 255, 255, .45);
 }
+
+/* =====================================================
+   Round 6：「押せるものは黒、押せないものはグレー」（この層が最後に効く）
+   - タップできるもの（ボタン・リンク・作用するピル・切り替え）：純黒 #0B0D12 ＋ グラデーションの縁。
+     ボタンとリンクは、下側の深い影と上側のハイライトで浮かせ、押すと沈む。
+     切り替え（人物・下位タブ・ログインの切り替え）は影なし（平らな黒＋縁）。
+   - 表示だけのラベル（案件番号・時間・ステータス・業種・結果バッジ・件数）：グレー #1a1c23、平ら・影なし。
+   前の層の上書きが何重にもあるため、この層では背景・枠・影に !important を使って決める。
+   ===================================================== */
+:root {
+  --k-black: #0b0d12;
+  --k-grey: #1a1c23;
+  --k-ring: linear-gradient(135deg, #3ff0ff, #8f72ff 52%, #ff4f9a);        /* 縁：少し明るめ */
+  --k-ring-danger: linear-gradient(135deg, #ff8a8e, #ff5a5f 60%, #d9486f); /* 削除：赤い縁 */
+  --k-sel: linear-gradient(135deg, rgba(0, 229, 255, .26), rgba(124, 92, 255, .3) 52%, rgba(255, 46, 136, .26)); /* 選ばれている切り替え */
+  --k-lift: 0 1px 0 rgba(255, 255, 255, .16) inset, 0 -1px 0 rgba(0, 0, 0, .55) inset, 0 8px 14px -6px rgba(0, 0, 0, .9), 0 2px 4px rgba(0, 0, 0, .55);
+  --k-press: 0 2px 3px rgba(0, 0, 0, .75) inset, 0 1px 1px rgba(0, 0, 0, .5);
+}
+
+/* 押せるボタン・リンク（浮く）：黒＋縁＋影 */
+.btn, .btn.small, .btn.ghost, .btn.danger, .btn.primary, a.btn, .icon-btn, .pill-plate, .btn.pill-plate,
+.topbar-actions .btn, #installBtn, .time-btn, .report-details > summary {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box !important;
+  border: 1.5px solid transparent !important;
+  color: var(--text) !important;
+  box-shadow: var(--k-lift) !important;
+  text-shadow: none;
+  transition: transform .12s var(--ease), box-shadow .15s, filter .15s;
+}
+.btn:hover, a.btn:hover, .pill-plate:hover, .time-btn:hover, .topbar-actions .btn:hover, .report-details > summary:hover {
+  filter: brightness(1.14);
+}
+.btn:active, a.btn:active, .pill-plate:active, .time-btn:active, .icon-btn:active, .topbar-actions .btn:active {
+  transform: translateY(2px) scale(.97) !important;
+  box-shadow: var(--k-press) !important;
+  filter: none;
+}
+/* 削除：黒＋赤い縁（ベタの赤は使わない） */
+.btn.danger, .visit-item .btn.danger, .mini-row .btn.danger {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring-danger) border-box !important;
+  color: #ff9ea2 !important;
+}
+/* メインの操作ボタン（保存する・報告する）：黒＋シアン→マゼンタの柔らかい光＋白文字 */
+.btn.primary, .visit-item .btn.primary, .mini-row .btn.primary {
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: var(--k-lift), 0 0 16px -4px rgba(0, 229, 255, .38), 0 0 18px -6px rgba(255, 46, 136, .42) !important;
+}
+/* 押せないボタン（戻る・進むなど）：グレー、淡く */
+.btn:disabled {
+  background: var(--k-grey) !important; border-color: transparent !important; box-shadow: none !important;
+  color: var(--text) !important; opacity: .35; transform: none !important; filter: none !important;
+}
+
+/* 押せる切り替え（チップ・タブ）：黒＋縁。影なし */
+.pc-chip:not(.active), .sub-tab:not(.active), .auth-tab:not(.active), .seg-btn:not(.active) {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box !important;
+  border: 1.5px solid transparent !important;
+  color: var(--sub) !important;
+  box-shadow: none !important;
+  transition: background .2s, color .2s;
+}
+.pc-chip:not(.active):hover, .sub-tab:not(.active):hover, .auth-tab:not(.active):hover, .seg-btn:not(.active):hover { color: var(--text) !important; }
+/* 選ばれている切り替え：ごく薄いグラデーションの面＋白文字＋柔らかい光 */
+.pc-chip.active, .sub-tab.active, .auth-tab.active {
+  background: linear-gradient(var(--k-sel), var(--k-sel)) padding-box, var(--k-ring) border-box !important;
+  border: 1.5px solid transparent !important;
+  color: #fff !important;
+  box-shadow: 0 0 14px -4px rgba(0, 229, 255, .45), 0 0 16px -6px rgba(255, 46, 136, .4) !important;
+}
+.pc-chip b, .pc-chip.active b { color: inherit !important; }
+
+/* 表示だけのラベル（グレー・平ら）：案件番号・時間・ステータス・業種・結果バッジ・件数 */
+.case-no, .badge, .tag, .due, .vtime, .vdate, .mini-title b, .lc-won, .auto-tag {
+  background: var(--k-grey) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  color: var(--text);
+}
+.tag.none { color: var(--faint) !important; }
+.tag.cat { color: var(--text) !important; }
+.badge.st-todo { color: var(--sub) !important; }
+
+/* 報告一覧の報告カード：報告者（上）・案件の場所（1行目）・数値（2行目） */
+.report-by { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.report-by b { color: var(--text); font-size: 15px; font-weight: 700; margin-left: 2px; }
+.report-meta { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.report-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0; font-size: 13px; color: var(--muted); }
+.report-meta-row .case-no { font-size: 12.5px; }
+.report-meta-row .ic { width: 15px; height: 15px; margin-right: 4px; color: var(--faint); vertical-align: -2px; }
+.report-details { margin-top: 12px; }
+.report-details > summary {
+  display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: var(--text) !important; cursor: pointer; list-style: none;
+}
+.report-details > summary::-webkit-details-marker { display: none; }
