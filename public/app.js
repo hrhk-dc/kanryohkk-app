@@ -732,7 +732,7 @@ const explainItemOf = (items) => (items || []).find((i) => (i.id === "explainTim
 // サービスの必要性（ラベルで探す。報告に保存された項目名と値をそのまま使う）
 const needItemOf = (items) => (items || []).find((i) => /必要性/.test(i.label || "") && i.value);
 // 2行目に入る短さにする（意味は変えない。「詳細を表示」の文はそのまま）。備考の（…）はそのまま残す
-const NEED_SHORT = [["上記に当てはまらない", "その他"], ["以前別の会社に依頼して使用したがやめた", "以前利用・解約"], ["既存のサービスで満足している", "既存で満足"], ["これ以上の集客を求めていない", "集客は不要"], ["予算がない", "予算なし"]];
+const NEED_SHORT = [["上記に当てはまらない", "その他"], ["以前別の会社に依頼して使用したがやめた", "以前利用・解約"], ["既存のサービスで満足している", "既存で満足"], ["これ以上の集客を求めていない", "集客不要"], ["予算がない", "予算なし"]];
 const needShort = (v) => { const s = String(v); const hit = NEED_SHORT.find(([long]) => s.startsWith(long)); return hit ? hit[1] + s.slice(hit[0].length) : s; };
 function normalizeFormat(key) {
   if (key === "report") { // 「資力」は「資金力」に名前を変更
@@ -1362,7 +1362,7 @@ function renderList() {
       </div>
       ${placeRow.length || numRow.length ? `<div class="report-meta">
         ${placeRow.length ? `<p class="report-meta-row">${placeRow.join("")}</p>` : ""}
-        ${numRow.length ? `<p class="report-meta-row">${numRow.join("")}</p>` : ""}
+        ${numRow.length ? `<p class="report-meta-row num-row">${numRow.map((s) => `<span>${s}</span>`).join("")}</p>` : ""}
       </div>` : ""}
       ${demoHtml}
       ${details ? `<details class="report-details"><summary>詳細を表示</summary>${details}</details>` : ""}
