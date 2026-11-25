@@ -827,11 +827,12 @@ function navOutline(W, cx, hw) {
   const x0 = cx - hw, x1 = cx + hw;
   const arcY = (x) => (x >= r && x <= W - r) ? top : mid - Math.sqrt(r * r - Math.pow(x < r ? r - x : x - (W - r), 2));
   const y0 = arcY(x0), y1 = arcY(x1);
-  return `M ${f(x0)} ${f(y0)}`
+  const sx = x0 < r ? x0 : r, sy = x0 < r ? y0 : top;
+  return `M ${f(sx)} ${f(sy)}` + (x0 > r ? ` L ${f(x0)} ${top}` : "")
     + ` C ${f(x0 + hw * .58)} ${f(y0)}, ${f(cx - hw * .4)} ${peak}, ${f(cx)} ${peak}`
     + ` C ${f(cx + hw * .4)} ${peak}, ${f(x1 - hw * .58)} ${f(y1)}, ${f(x1)} ${f(y1)}`
     + (x1 < W - r ? ` L ${W - r} ${top}` : "")
-    + ` A ${r} ${r} 0 0 1 ${W - r} ${bot} L ${r} ${bot} A ${r} ${r} 0 0 1 ${f(x0)} ${f(y0)} Z`;
+    + ` A ${r} ${r} 0 0 1 ${W - r} ${bot} L ${r} ${bot} A ${r} ${r} 0 0 1 ${f(sx)} ${f(sy)} Z`;
 }
 function drawNav(cx) {
   const nav = $("#mainNav"), active = nav.querySelector(".tab.active");
