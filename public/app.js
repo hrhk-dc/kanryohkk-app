@@ -811,7 +811,94 @@ function showTab(name) {
   if (name === "stats") renderStats();
   window.scrollTo(0, 0);
   document.querySelector(".tabs")?.classList.remove("hide");
+  layoutNav(true);
 }
+
+/* ---------- 下のナビの輪郭（ピル＋選択タブの低い丘を1本のSVGパスで） ----------
+   縁・塗り・内側の光は同じ輪郭を共有するので、縁のグラデーションは途切れず一周し、
+   選んだタブの丘は棒に溶け込む。丘は低く幅広い（高さ約10px・裾は約2タブ分）。 */
+const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 10, NAV_LOGO = 56;
+let navCx = null, navAnim = null, navTarget = null;
+const navReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function navOutline(W, cx, bwL, bwR) {
+  const top = NAV_PAD, bot = NAV_PAD + NAV_H, r = NAV_H / 2, peak = top - NAV_BUMP;
+  const x0 = cx - bwL, x1 = cx + bwR, f = (n) => Math.round(n * 10) / 10;
+  return `M ${r} ${top} L ${f(x0)} ${top}`
+    + ` C ${f(x0 + bwL * .58)} ${top}, ${f(cx - bwL * .4)} ${peak}, ${f(cx)} ${peak}`
+    + ` C ${f(cx + bwR * .4)} ${peak}, ${f(x1 - bwR * .58)} ${top}, ${f(x1)} ${top}`
+    + ` L ${W - r} ${top} A ${r} ${r} 0 0 1 ${W - r} ${bot} L ${r} ${bot} A ${r} ${r} 0 0 1 ${r} ${top} Z`;
+}
+function drawNav(cx) {
+  const nav = $("#mainNav"), active = nav.querySelector(".tab.active");
+  const W = nav.clientWidth;
+  if (!active || !W || !active.offsetWidth) return;
+  const want = active.offsetWidth, r = NAV_H / 2;
+  // 端のタブでは、外側の裾は縮め、内側の裾だけを広げる（ロゴの丸ボタンの上・角の丸みには載せない）
+  const lo = NAV_LOGO + 4, hi = W - r;
+  cx = Math.max(lo + 14, Math.min(hi - 28, cx));
+  const bwL = Math.max(14, Math.min(want, cx - lo));
+  const bwR = Math.max(14, Math.min(want, hi - cx));
+  const d = navOutline(W, cx, bwL, bwR), set = (id, a) => { const e = $("#" + id); for (const k in a) e.setAttribute(k, a[k]); };
+  ["navFill", "navRim", "navRimGlow", "navClipPath"].forEach((id) => set(id, { d }));
+  const avg = (bwL + bwR) / 2;
+  set("navGlowIn", { cx, cy: NAV_PAD + 1, rx: avg * 1.35, ry: 24 });
+  set("navBloom", { cx: W / 2, cy: NAV_PAD + NAV_H / 2, rx: W * .44, ry: 30 });
+}
+function layoutNav(animate) {
+  const nav = $("#mainNav"), active = nav?.querySelector(".tab.active");
+  if (!active || !active.offsetWidth) return;
+  const target = active.offsetLeft + active.offsetWidth / 2;
+  if (navAnim && target === navTarget) return;
+  navTarget = target;
+  if (navCx === null || !animate || navReduce) {
+    if (navAnim) { cancelAnimationFrame(navAnim); navAnim = null; }
+    navCx = target; drawNav(target); return;
+  }
+  if (navAnim) cancelAnimationFrame(navAnim);
+  const from = navCx, dur = 320; let start = null;
+  const step = (ts) => {
+    if (start === null) start = ts;
+    const t = Math.min(1, (ts - start) / dur);
+    // バネ：わずかに行き過ぎて、約250msで落ち着く
+    const e = t >= 1 ? 1 : 1 - Math.exp(-7 * t) * Math.cos(8 * t);
+    navCx = from + (target - from) * e;
+    drawNav(navCx);
+    if (t < 1) navAnim = requestAnimationFrame(step); else navAnim = null;
+  };
+  navAnim = requestAnimationFrame(step);
+}
+(() => {
+  const nav = document.querySelector("#mainNav");
+  if (!nav) return;
+  const redraw = () => requestAnimationFrame(() => { navTarget = null; layoutNav(false); });
+  if ("ResizeObserver" in window) new ResizeObserver(redraw).observe(nav);
+  window.addEventListener("resize", redraw);
+  // 集計・管理タブの出し入れ（管理者6／作業員4）に合わせて引き直す
+  new MutationObserver(() => requestAnimationFrame(() => layoutNav(true))).observe(nav, { attributes: true, attributeFilter: ["class"], subtree: true });
+  redraw();
+})();
+// 入力中にキーボードが開いたら、ナビを一時的に隠す（入力欄が隠れないように）
+(() => {
+  const nav = document.querySelector("#mainNav");
+  if (!nav) return;
+  const isField = (el) => el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !/^(checkbox|radio|button|submit|file|range)$/.test(el.type || "");
+  let kb = false;
+  const set = (v) => { if (kb !== v) { kb = v; nav.classList.toggle("kb-hide", v); } };
+  document.addEventListener("focusin", (e) => { if (isField(e.target)) set(true); });
+  document.addEventListener("focusout", () => setTimeout(() => set(isField(document.activeElement)), 60));
+  // visualViewport が縮んだ（キーボードが出た）ときも隠す
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    const check = () => { if (isField(document.activeElement)) set(vv.height < window.innerHeight - 120); else set(false); };
+    vv.addEventListener("resize", check);
+  }
+})();
+// 古い・低スペックの端末ではガラスのぼかしを使わず、半透明のベタ塗りにする
+(() => {
+  const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2)
+    || (navigator.connection && navigator.connection.saveData);
+  if (weak) document.documentElement.classList.add("lowfx");
+})();
 // 下にスクロールで下のタブを隠し、上にスクロールで出す（一番下に着いても隠れたまま）
 // 上のバーは、下にスクロールしたら隠し、一番上に戻ったときだけ出す
 (() => {
