@@ -1400,3 +1400,37 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 .brand-mark {
   filter: drop-shadow(0 0 10px rgba(125, 211, 255, .9)) drop-shadow(0 0 24px rgba(79, 139, 255, .7)) drop-shadow(0 0 40px rgba(0, 229, 255, .35));
 }
+
+/* ================================================================
+   Round 9（v62）
+   選択中のピル（日付切替：今日・明日・日付を選ぶ ／ ログイン画面：ログイン・新規登録）を、
+   ヘッダーの「地図・デモサイト・デモURLをコピー・報告する」と同じ見た目にする。
+   中央は純黒（--k-black）、縁だけ虹色（--k-ring、シアン→マゼンタ）の 2.5px。
+   ピル内部にグラデーションの塗りは使わない。文字は白・太字のまま。
+   未選択は Round 8 追補（v61）のまま（背景は透明、縁なし、グレーの文字）。
+   ================================================================ */
+/* 中央は純黒。縁は border ではなく ::before（マスクで描く 2.5px の虹色の輪）。
+   Chrome は border の太さを整数の px に切り捨てるため（2.5px → 2px）、border では 2.5px にならない。
+   padding は小数のまま効くので、padding 2.5px の輪を使う。レイアウトは変えない。 */
+.auth-tab.active, .auth-tab:active, #todaySeg .seg-btn.active, #todaySeg .seg-btn:active {
+  position: relative;
+  isolation: isolate;
+  background: var(--k-black) !important;
+  border: 0 !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 0 14px -4px rgba(0, 229, 255, .45), 0 0 16px -6px rgba(255, 46, 136, .4) !important;
+}
+.auth-tab.active::before, .auth-tab:active::before, #todaySeg .seg-btn.active::before, #todaySeg .seg-btn:active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 2.5px;
+  background: var(--k-ring);
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
