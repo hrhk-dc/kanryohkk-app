@@ -838,9 +838,10 @@ function drawNav(cx) {
   const nav = $("#mainNav"), active = nav.querySelector(".tab.active");
   const W = nav.clientWidth;
   if (!active || !W || !active.offsetWidth) return;
-  // 頂点は選択タブの中心。左右の裾は常に同じ幅（端のタブも同じ。ナビの左右の余白で収める）
-  const edge = 24;
-  const hw = Math.max(10, Math.min(34, cx - edge, W - edge - cx));
+  // 頂点は選択タブの中心。裾は左右対称で、ピルの上辺の直線部分（丸い端の曲線の手前）に水平に接する。
+  // 端のタブでは裾の幅を、丸い端の半径ぶんまでに収める（曲線の上に裾を載せると段差が出るため）
+  const r = NAV_H / 2;
+  const hw = Math.max(10, Math.min(34, cx - r, W - r - cx));
   const d = navOutline(W, cx, hw), set = (id, a) => { const e = $("#" + id); for (const k in a) e.setAttribute(k, a[k]); };
   ["navFill", "navRim", "navRimGlow", "navClipPath"].forEach((id) => set(id, { d }));
   set("navGlowIn", { cx, cy: NAV_PAD + 1, rx: hw * 1.35, ry: 24 });
