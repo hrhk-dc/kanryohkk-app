@@ -1897,11 +1897,12 @@ function updateCaseNoList() {
     }).join("");
 }
 
-/* 訪問予定時刻：カードの上の時刻をタップして、アラームのように回して選ぶ（10分刻み。自分が登録したもの／管理者のみ変更可） */
+/* 訪問予定時刻：カードの右上の時刻（素の文字）をタップして、アラームのように回して選ぶ（10分刻み。自分が登録したもの／管理者のみ変更可）
+   Round 12（v65）：時計アイコンとグレーのピルを外し、時刻の文字そのものをボタンにする（動きは変えない） */
 function timeSelectHtml(v, time) {
   const cur = snap10(time);
-  if (!canModify(v)) return cur ? `<span class="vtime">${ic("clock")}${esc(fmtHour(time))}</span>` : "";
-  return `<span class="vtime">${ic("clock")}<button type="button" class="time-btn small${cur ? "" : " empty-val"}" data-vtime-pick="${esc(v.id)}" aria-label="訪問予定時刻">${cur ? esc(fmtHour(cur)) : "時間未定"}</button></span>`;
+  if (!canModify(v)) return cur ? `<span class="vtime">${esc(fmtHour(time))}</span>` : "";
+  return `<span class="vtime"><button type="button" class="time-btn small${cur ? "" : " empty-val"}" data-vtime-pick="${esc(v.id)}" aria-label="訪問予定時刻">${cur ? esc(fmtHour(cur)) : "時間未定"}</button></span>`;
 }
 async function saveVisitTime(v, value) {
   if (!v || !canModify(v)) return;

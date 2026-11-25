@@ -1468,3 +1468,35 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 .tab svg { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .85)); }
 .tab.active svg { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .85)) drop-shadow(0 0 7px rgba(130, 205, 255, .6)); }
 .tab span { text-shadow: 0 2px 3px rgba(0, 0, 0, .85); }
+
+/* ================================================================
+   Round 12（v65）：訪問カードの時刻を、右上の素のテキストにする（オーナー指示。Round 6 の「時間＝グレーのピル」を上書き）
+   1. 時刻の周りのグレーのピル・時計アイコンはなし（時計アイコンは app.js の timeSelectHtml から外した）。
+   2. 時刻の文字そのものがボタン（data-vtime-pick）。タップで既存の時刻ピッカーが開く。動き・保存は変えない。
+   3. 訪問カードの日時の行の右端に寄せる（margin-left:auto）＝カードの右上の角に固定。
+   4. 予定カード（.mini-title b）の時刻も、同じく素のテキストにする（表示だけ。タップはさせない）。
+   ================================================================ */
+.visit-item .visit-sub > .move-btns { order: 1; }
+.visit-item .visit-sub > .vtime { order: 2; margin-left: auto; flex: none; }
+.visit-item .vtime {
+  display: inline-flex; align-items: center; gap: 0;
+  background: none !important; border: 0 !important; box-shadow: none !important; filter: none !important;
+  padding: 0; border-radius: 0; font-size: 16px; font-weight: 700; color: var(--text);
+}
+/* 時刻の文字そのものを押せる範囲（見た目は文字だけ。押せる範囲は少し広く取る） */
+.visit-item .vtime .time-btn {
+  min-height: 0 !important; height: auto;
+  padding: 6px 0 6px 12px; margin: -6px 0 -6px -12px;
+  background: none !important; border: 0 !important; box-shadow: none !important; filter: none !important;
+  border-radius: 0; color: var(--text) !important; text-shadow: none;
+  font-size: 16px; font-weight: 700; letter-spacing: .02em;
+}
+.visit-item .vtime .time-btn.empty-val { color: var(--muted) !important; font-weight: 600; }
+.visit-item .vtime .time-btn:hover { color: var(--text) !important; filter: none !important; }
+.visit-item .vtime .time-btn:active { transform: scale(.96) !important; box-shadow: none !important; color: var(--sub) !important; }
+/* 予定カードの時刻：グレーのピルをやめ、素の文字（タップはしない） */
+.mini-title b {
+  background: none !important; border: 0 !important; box-shadow: none !important;
+  padding: 0; margin: 0 4px 0 0; border-radius: 0;
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
