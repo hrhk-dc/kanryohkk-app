@@ -1375,3 +1375,28 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 
 /* 押したとき：わずかに縮む（ボタンと同じ 0.97） */
 .auth-tab:active, #todaySeg .seg-btn:active { transform: scale(.97); }
+
+/* ================================================================
+   Round 8 追補（v61）
+   A. 虹色の縁を少し太くする：選択中ピルの縁を 1.5px から 2px にする（ログイン・日付の両方）。
+   B. 未選択は台になじませる：未選択の背景を透明にし、切り替えの台（rgba(0, 0, 0, .45)）と同じ見た目にする。--k-grey は使わない。
+   D. ロゴの光を強くする：.brand-mark の drop-shadow を3層にして、芯を明るく・ハローを広くする。
+   ================================================================ */
+/* A. 選択中の虹色の縁を太くする（1.5px → 2px） */
+.auth-tab.active,
+.auth-tab:active,
+#todaySeg .seg-btn.active,
+#todaySeg .seg-btn:active {
+  border: 2px solid transparent !important;
+}
+
+/* B. 未選択：背景を透明にして台になじませる */
+.auth-tab:not(.active),
+#todaySeg .seg-btn:not(.active) {
+  background: transparent !important;
+}
+
+/* D. ロゴの光を強くする：芯を明るく、ハローを広く（3層） */
+.brand-mark {
+  filter: drop-shadow(0 0 10px rgba(125, 211, 255, .9)) drop-shadow(0 0 24px rgba(79, 139, 255, .7)) drop-shadow(0 0 40px rgba(0, 229, 255, .35));
+}
