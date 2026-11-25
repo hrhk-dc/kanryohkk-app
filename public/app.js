@@ -820,27 +820,30 @@ function showTab(name) {
 const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 10;
 let navCx = null, navAnim = null, navTarget = null;
 const navReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-function navOutline(W, cx, bwL, bwR) {
-  const top = NAV_PAD, bot = NAV_PAD + NAV_H, r = NAV_H / 2, peak = top - NAV_BUMP;
-  const x0 = cx - bwL, x1 = cx + bwR, f = (n) => Math.round(n * 10) / 10;
-  return `M ${r} ${top} L ${f(x0)} ${top}`
-    + ` C ${f(x0 + bwL * .58)} ${top}, ${f(cx - bwL * .4)} ${peak}, ${f(cx)} ${peak}`
-    + ` C ${f(cx + bwR * .4)} ${peak}, ${f(x1 - bwR * .58)} ${top}, ${f(x1)} ${top}`
-    + ` L ${W - r} ${top} A ${r} ${r} 0 0 1 ${W - r} ${bot} L ${r} ${bot} A ${r} ${r} 0 0 1 ${r} ${top} Z`;
+function navOutline(W, cx, hw) {
+  // 丘は左右同じ幅。端のタブでは、丘の裾をピル角の弧の上（上辺とほぼ同じ高さ）に載せ、切らない
+  const top = NAV_PAD, bot = NAV_PAD + NAV_H, r = NAV_H / 2, peak = top - NAV_BUMP, mid = top + r;
+  const f = (n) => Math.round(n * 10) / 10;
+  const x0 = cx - hw, x1 = cx + hw;
+  const arcY = (x) => (x >= r && x <= W - r) ? top : mid - Math.sqrt(r * r - Math.pow(x < r ? r - x : x - (W - r), 2));
+  const y0 = arcY(x0), y1 = arcY(x1);
+  const sx = x0 < r ? x0 : r, sy = x0 < r ? y0 : top;
+  return `M ${f(sx)} ${f(sy)}` + (x0 > r ? ` L ${f(x0)} ${top}` : "")
+    + ` C ${f(x0 + hw * .58)} ${f(y0)}, ${f(cx - hw * .4)} ${peak}, ${f(cx)} ${peak}`
+    + ` C ${f(cx + hw * .4)} ${peak}, ${f(x1 - hw * .58)} ${f(y1)}, ${f(x1)} ${f(y1)}`
+    + (x1 < W - r ? ` L ${W - r} ${top}` : "")
+    + ` A ${r} ${r} 0 0 1 ${W - r} ${bot} L ${r} ${bot} A ${r} ${r} 0 0 1 ${f(sx)} ${f(sy)} Z`;
 }
 function drawNav(cx) {
   const nav = $("#mainNav"), active = nav.querySelector(".tab.active");
   const W = nav.clientWidth;
   if (!active || !W || !active.offsetWidth) return;
-  const want = active.offsetWidth, r = NAV_H / 2;
-  // 丘の頂点は、選択タブの中心（アイコンの中心）に必ず置く。端のタブでは外側の裾だけを縮める
-  const lo = r, hi = W - r;
-  const bwL = Math.max(10, Math.min(want, cx - lo));
-  const bwR = Math.max(10, Math.min(want, hi - cx));
-  const d = navOutline(W, cx, bwL, bwR), set = (id, a) => { const e = $("#" + id); for (const k in a) e.setAttribute(k, a[k]); };
+  // 頂点は選択タブの中心。左右の裾は常に同じ幅（端のタブも同じ。ナビの左右の余白で収める）
+  const edge = 24;
+  const hw = Math.max(10, Math.min(34, cx - edge, W - edge - cx));
+  const d = navOutline(W, cx, hw), set = (id, a) => { const e = $("#" + id); for (const k in a) e.setAttribute(k, a[k]); };
   ["navFill", "navRim", "navRimGlow", "navClipPath"].forEach((id) => set(id, { d }));
-  const avg = (bwL + bwR) / 2;
-  set("navGlowIn", { cx, cy: NAV_PAD + 1, rx: avg * 1.35, ry: 24 });
+  set("navGlowIn", { cx, cy: NAV_PAD + 1, rx: hw * 1.35, ry: 24 });
   set("navBloom", { cx: W / 2, cy: NAV_PAD + NAV_H / 2, rx: W * .44, ry: 30 });
 }
 function layoutNav(animate) {
@@ -2014,7 +2017,7 @@ function renderVisitList() {
       ${hoursHtml}
       <div class="btn-row visit-status">${st.html}
         ${st.done ? "" : `<button class="btn small primary" type="button" data-report-visit="${esc(v.id)}">この訪問を報告する</button>`}
-        ${v.demoUrl ? `<a class="btn small" href="${esc(v.demoUrl)}" target="_blank" rel="noopener">デモサイトを開く</a><button class="btn small" type="button" data-copy="${esc(v.demoUrl)}">デモURLをコピー</button>` : ""}
+        ${v.demoUrl ? `<a class="btn small demo-open" href="${esc(v.demoUrl)}" target="_blank" rel="noopener">デモサイトを開く</a><button class="btn small" type="button" data-copy="${esc(v.demoUrl)}">デモURLをコピー</button>` : ""}
       </div>
       ${itemsDl(main)}
       ${more.some((i) => i.value) ? `<details class="report-details"><summary>店舗の詳細（住所・営業時間など）</summary>${itemsDl(more)}</details>` : ""}
@@ -2315,7 +2318,7 @@ function mapsDirUrl(list) {
   if (stops.length > 1) u.searchParams.set("waypoints", stops.slice(0, -1).slice(0, 9).join("|"));
   return u.toString();
 }
-const demoLinksHtml = (url) => url ? `<a class="btn small" href="${esc(url)}" target="_blank" rel="noopener">${ic("globe")}デモサイト</a><a class="demo-url-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(String(url).replace(/^https?:\/\//, ""))}</a><button class="btn small" type="button" data-copy="${esc(url)}">デモURLをコピー</button>` : "";
+const demoLinksHtml = (url) => url ? `<a class="btn small demo-open" href="${esc(url)}" target="_blank" rel="noopener">${ic("globe")}デモサイト</a><button class="btn small" type="button" data-copy="${esc(url)}">デモURLをコピー</button>` : "";
 function visitMiniHtml(v, opts = {}) {
   const st = visitStatus(v);
   const maps = (v.items || []).find((i) => i.type === "maps" && i.value)?.value;
