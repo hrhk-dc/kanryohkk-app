@@ -1008,7 +1008,7 @@ input[type="checkbox"]:disabled { opacity: .4; }
 :root { --nav-fill-top: #111a2c; --nav-fill-bot: #080b14; }
 :root[data-theme="light"] { --nav-fill-top: #ffffff; --nav-fill-bot: #eef1f7; }
 .tabs {
-  height: 72px; padding: 0 18px 0 0; gap: 0; align-items: stretch; justify-content: flex-start;
+  height: 72px; padding: 0 12px; gap: 0; align-items: stretch; justify-content: flex-start;
   background: none; border: 0; border-radius: 0; box-shadow: none;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
@@ -1017,14 +1017,6 @@ input[type="checkbox"]:disabled { opacity: .4; }
   position: absolute; left: 0; top: -24px; width: 100%; height: calc(100% + 24px);
   overflow: visible; pointer-events: none;
   filter: drop-shadow(0 14px 26px rgba(0, 0, 0, .5));
-}
-/* 左端：くぼんだ丸いロゴボタン */
-.nav-logo {
-  position: relative; z-index: 1; flex: none; align-self: center;
-  width: 44px; height: 44px; margin: 0 4px 0 7px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, .06), rgba(0, 0, 0, .35));
-  box-shadow: inset 0 3px 8px rgba(0, 0, 0, .65), inset 0 -1px 0 rgba(255, 255, 255, .1), 0 0 0 1px rgba(255, 255, 255, .06);
 }
 .tab {
   position: relative; z-index: 1; flex: 1 1 0; min-width: 0; min-height: 48px;
@@ -1075,3 +1067,38 @@ html.lowfx .ts-backdrop { background: rgba(0, 0, 0, .78); }
 #navGlowIn { opacity: .25; }   /* 旧 .5 */
 /* 縁の外側のグロー：不透明度を半分（ぼかしの半径は index.html の nvB4 で決まる） */
 #navRimGlow { opacity: .08; }  /* 旧 .16 */
+
+/* =====================================================
+   Round 3：色は鮮やかに戻す（くすみ・脱色なし）。セカンダリのボタンはすべてダークガラスのピル＋グラデーションの縁。
+   灰色に見えていた本当の原因：.btn / .btn.ghost / .btn.small / .icon-btn / .topbar-actions .btn.ghost /
+   .visit-item .btn / .mini-row .btn / .time-btn.empty-val / .pc-chip / .sub-tab / .vtime が
+   すべて「白8％のベタ ＋ 細い灰色の線（--tile ＋ --glass-line）」のままだった。
+   ===================================================== */
+:root {
+  --aurora-fill: linear-gradient(135deg, #00e5ff, #7c5cff 52%, #ff2e88);
+  --aurora-soft: linear-gradient(135deg, rgba(0, 229, 255, .3), rgba(124, 92, 255, .34) 52%, rgba(255, 46, 136, .3));
+  --ring-soft: linear-gradient(135deg, rgba(0, 229, 255, .85), rgba(124, 92, 255, .85) 52%, rgba(255, 46, 136, .85));
+  --ring-btn: linear-gradient(135deg, rgba(0, 229, 255, .8), rgba(124, 92, 255, .8) 52%, rgba(255, 46, 136, .8));
+  --ic-ice: #dff4ff;
+}
+:root[data-theme="light"] { --ring-fill: #f4f6fb; --ic-ice: #0b2a4a; }
+/* アーチの内側の光：元の鮮やかな色に戻す（不透明度は .25 のまま柔らかく） */
+#nvGlow stop:nth-child(1) { stop-color: #00c8ee; stop-opacity: .8; }
+#nvGlow stop:nth-child(2) { stop-color: #7c5cff; stop-opacity: .66; }
+#nvGlow stop:nth-child(3) { stop-color: #ff2e88; stop-opacity: .8; }
+.btn.primary, .btn.primary:hover, .visit-item .btn.primary, .visit-item .btn.primary:hover, .mini-row .btn.primary, .mini-row .btn.primary:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 8px 14px -10px rgba(124, 92, 255, .5);
+}
+.btn:not(.primary):not(.danger), .btn.ghost:not(.primary):not(.danger), .topbar-actions .btn.ghost,
+.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger), .report-card .btn:not(.primary):not(.danger),
+.time-btn.empty-val, .sub-tab:not(.active), .pc-chip:not(.active), .vtime, .mini-title b {
+  background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-btn) border-box;
+  border: 1.1px solid transparent; box-shadow: none; color: var(--sub);
+}
+.btn:not(.primary):not(.danger):hover, .topbar-actions .btn.ghost:hover, .visit-item .btn:not(.primary):not(.danger):hover,
+.mini-row .btn:not(.primary):not(.danger):hover, .sub-tab:not(.active):hover, .pc-chip:not(.active):hover {
+  color: var(--text); filter: brightness(1.2);
+}
+.btn:not(.primary):not(.danger) .ic, .btn:not(.primary):not(.danger)::before, .icon-btn svg, .topbar-actions .btn svg { color: var(--ic-ice); }
+.icon-btn { border-radius: 999px; }
+.mini-title b, .pc-chip b { color: var(--text); }
