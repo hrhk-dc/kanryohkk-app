@@ -1311,9 +1311,9 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
   }
 }
 
-/* 4. ボトムナビ：塗りを約半分の不透明度にし、後ろが透ける明るいガラスにする */
+/* 4. ボトムナビ：塗りは SVG（nvFill）の方で半分にする。ここは透明のまま（アーチ層の意図通り） */
 .tabs {
-  background: rgba(24, 24, 27, .44) !important;
+  background: none !important;
 }
 
 /* 5. ボトムナビの選択中ラベル：ネオンの水色＋グロー。未選択はグレーのまま。アイコンは白のまま */
