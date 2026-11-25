@@ -794,16 +794,10 @@ label { color: var(--sub); }
 
 /* 訪問カード・予定の行のボタン：地図／デモサイト／デモURLをコピー＝ガラスのピル */
 .visit-item .btn, .mini-row .btn { border-radius: 999px; }
-.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger) {
+.visit-item .btn:not(.primary):not(.danger):not(.pill-plate), .mini-row .btn:not(.primary):not(.danger):not(.pill-plate) {
   background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line);
 }
-.visit-item .btn:not(.primary):not(.danger):hover, .mini-row .btn:not(.primary):not(.danger):hover { background: var(--tile-hi); }
-/* デモサイトのボタン：案件番号ピルと同じ（黒の塗り＋1.5pxのグラデーション縁） */
-.visit-item .btn.demo-open, .report-card .btn.demo-open, .mini-row .btn.demo-open,
-.visit-item .btn.demo-open:hover, .report-card .btn.demo-open:hover, .mini-row .btn.demo-open:hover {
-  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--aurora) border-box;
-  border: 1.5px solid transparent; box-shadow: none; color: var(--text);
-}
+.visit-item .btn:not(.primary):not(.danger):not(.pill-plate):hover, .mini-row .btn:not(.primary):not(.danger):not(.pill-plate):hover { background: var(--tile-hi); }
 /* 報告する：最重要なので、シアン→マゼンタのグラデーションのピル */
 .visit-item .btn.primary, .mini-row .btn.primary, .visit-item .btn.primary:hover, .mini-row .btn.primary:hover {
   background: var(--aurora); border: 0; color: #0b0d12; font-weight: 700;
@@ -923,7 +917,7 @@ a:hover { color: var(--text); }
 
 /* ----- 報告一覧・訪問リストのカード ----- */
 .report-card .btn, .visit-item .btn, .mini-row .btn { border-radius: 999px; }
-.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger) { background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.visit-item .btn:not(.primary):not(.danger):not(.pill-plate), .mini-row .btn:not(.primary):not(.danger):not(.pill-plate) { background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
 /* デモURLの文字：白70％、きれいに折り返す */
 .demo-url-link, .report-card .demo-url-link {
   color: var(--sub); text-decoration: none; word-break: normal; overflow-wrap: anywhere; min-width: 0; flex: 1 1 160px; text-align: left;
@@ -1095,16 +1089,44 @@ html.lowfx .ts-backdrop { background: rgba(0, 0, 0, .78); }
 .btn.primary, .btn.primary:hover, .visit-item .btn.primary, .visit-item .btn.primary:hover, .mini-row .btn.primary, .mini-row .btn.primary:hover {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 8px 14px -10px rgba(124, 92, 255, .5);
 }
-.btn:not(.primary):not(.danger), .btn.ghost:not(.primary):not(.danger), .topbar-actions .btn.ghost,
-.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger), .report-card .btn:not(.primary):not(.danger),
+.btn:not(.primary):not(.danger):not(.pill-plate), .btn.ghost:not(.primary):not(.danger):not(.pill-plate), .topbar-actions .btn.ghost,
+.visit-item .btn:not(.primary):not(.danger):not(.pill-plate), .mini-row .btn:not(.primary):not(.danger):not(.pill-plate), .report-card .btn:not(.primary):not(.danger):not(.pill-plate),
 .time-btn.empty-val, .sub-tab:not(.active), .pc-chip:not(.active), .vtime, .mini-title b {
   background: linear-gradient(var(--ring-fill), var(--ring-fill)) padding-box, var(--ring-btn) border-box;
   border: 1.1px solid transparent; box-shadow: none; color: var(--sub);
 }
-.btn:not(.primary):not(.danger):hover, .topbar-actions .btn.ghost:hover, .visit-item .btn:not(.primary):not(.danger):hover,
-.mini-row .btn:not(.primary):not(.danger):hover, .sub-tab:not(.active):hover, .pc-chip:not(.active):hover {
+.btn:not(.primary):not(.danger):not(.pill-plate):hover, .topbar-actions .btn.ghost:hover, .visit-item .btn:not(.primary):not(.danger):not(.pill-plate):hover,
+.mini-row .btn:not(.primary):not(.danger):not(.pill-plate):hover, .sub-tab:not(.active):hover, .pc-chip:not(.active):hover {
   color: var(--text); filter: brightness(1.2);
 }
-.btn:not(.primary):not(.danger) .ic, .btn:not(.primary):not(.danger)::before, .icon-btn svg, .topbar-actions .btn svg { color: var(--ic-ice); }
+.btn:not(.primary):not(.danger):not(.pill-plate) .ic, .btn:not(.primary):not(.danger):not(.pill-plate)::before, .icon-btn svg, .topbar-actions .btn svg { color: var(--ic-ice); }
 .icon-btn { border-radius: 999px; }
 .mini-title b, .pc-chip b { color: var(--text); }
+
+/* =====================================================
+   共有のピル（案件番号と同じ見た目）。.case-no と .pill-plate（デモサイト・地図・デモURLをコピー・未報告）は
+   この1つの規則だけで決まる。黒の塗り＋1.5pxのグラデーションの縁。
+   ===================================================== */
+.case-no, .pill-plate, .btn.pill-plate, .badge.pill-plate {
+  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--aurora) border-box;
+  border: 1.5px solid transparent; border-radius: 999px; color: var(--text);
+  font-size: 12.5px; font-weight: 700; letter-spacing: .05em; padding: 1px 11px; box-shadow: none; filter: none;
+}
+.pill-plate .ic { color: var(--text); }
+
+/* =====================================================
+   立体感（共有のピルの上に重ねる層）：リンクを開くボタンと主要なボタンだけ。
+   案件番号・時刻・状態バッジは平らなまま。形と色は上の規則のまま。
+   ===================================================== */
+a.btn, .btn.primary, .btn.pill-plate, .visit-item .btn.primary, .mini-row .btn.primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -1px 0 rgba(0, 0, 0, .32), 0 3px 8px -3px rgba(0, 0, 0, .6);
+  transition: transform .12s var(--ease), box-shadow .15s, filter .15s;
+}
+a.btn:hover, .btn.primary:hover, .btn.pill-plate:hover, .visit-item .btn.primary:hover, .mini-row .btn.primary:hover {
+  transform: translateY(-1px);
+}
+a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.primary:active, .mini-row .btn.primary:active {
+  transform: scale(.97);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35), 0 1px 2px -1px rgba(0, 0, 0, .5);
+  filter: none;
+}

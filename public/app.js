@@ -2017,7 +2017,7 @@ function renderVisitList() {
       ${hoursHtml}
       <div class="btn-row visit-status">${st.html}
         ${st.done ? "" : `<button class="btn small primary" type="button" data-report-visit="${esc(v.id)}">この訪問を報告する</button>`}
-        ${v.demoUrl ? `<a class="btn small demo-open" href="${esc(v.demoUrl)}" target="_blank" rel="noopener">デモサイトを開く</a><button class="btn small" type="button" data-copy="${esc(v.demoUrl)}">デモURLをコピー</button>` : ""}
+        ${v.demoUrl ? `<a class="btn small demo-open pill-plate" href="${esc(v.demoUrl)}" target="_blank" rel="noopener">デモサイトを開く</a><button class="btn small pill-plate" type="button" data-copy="${esc(v.demoUrl)}">デモURLをコピー</button>` : ""}
       </div>
       ${itemsDl(main)}
       ${more.some((i) => i.value) ? `<details class="report-details"><summary>店舗の詳細（住所・営業時間など）</summary>${itemsDl(more)}</details>` : ""}
@@ -2283,7 +2283,7 @@ function reportsOfCase(no) {
 }
 function visitStatus(v) {
   const rs = reportsOfCase(v.caseNo);
-  if (!rs.length) return { done: false, html: `<span class="badge st-todo">未報告</span>` };
+  if (!rs.length) return { done: false, html: `<span class="badge st-todo pill-plate">未報告</span>` };
   const latest = [...rs].sort((a, b) => tsNum(b.createdAt) - tsNum(a.createdAt))[0];
   const res = itemVal(latest.items, "result");
   return { done: true, result: res, html: `<span class="badge st-done ${RESULT_CLASS[res] || ""}">報告済み${res ? `・${esc(res)}` : ""}</span>` };
@@ -2318,7 +2318,7 @@ function mapsDirUrl(list) {
   if (stops.length > 1) u.searchParams.set("waypoints", stops.slice(0, -1).slice(0, 9).join("|"));
   return u.toString();
 }
-const demoLinksHtml = (url) => url ? `<a class="btn small demo-open" href="${esc(url)}" target="_blank" rel="noopener">${ic("globe")}デモサイト</a><button class="btn small" type="button" data-copy="${esc(url)}">デモURLをコピー</button>` : "";
+const demoLinksHtml = (url) => url ? `<a class="btn small demo-open pill-plate" href="${esc(url)}" target="_blank" rel="noopener">${ic("globe")}デモサイト</a><button class="btn small pill-plate" type="button" data-copy="${esc(url)}">デモURLをコピー</button>` : "";
 function visitMiniHtml(v, opts = {}) {
   const st = visitStatus(v);
   const maps = (v.items || []).find((i) => i.type === "maps" && i.value)?.value;
@@ -2329,7 +2329,7 @@ function visitMiniHtml(v, opts = {}) {
       <div class="mini-sub">${[placeOf(v), industryOf(v), personOf(v)].filter(Boolean).map(esc).join(" · ")}</div>
     </div>
     <div class="btn-row" style="margin:0">${st.html}
-      ${maps ? `<a class="btn small" href="${esc(maps)}" target="_blank" rel="noopener">地図</a>` : ""}
+      ${maps ? `<a class="btn small pill-plate" href="${esc(maps)}" target="_blank" rel="noopener">地図</a>` : ""}
       ${demoLinksHtml(v.demoUrl || itemVal(v.items, "demoUrl"))}
       ${st.done ? "" : `<button class="btn small primary" type="button" data-report-visit="${esc(v.id)}">報告する</button>`}
     </div>
