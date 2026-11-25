@@ -817,7 +817,7 @@ function showTab(name) {
 /* ---------- 下のナビの輪郭（ピル＋選択タブの低い丘を1本のSVGパスで） ----------
    縁・塗り・内側の光は同じ輪郭を共有するので、縁のグラデーションは途切れず一周し、
    選んだタブの丘は棒に溶け込む。丘は低く幅広い（高さ約10px・裾は約2タブ分）。 */
-const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 10;
+const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 6.5;
 let navCx = null, navAnim = null, navTarget = null;
 const navReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function navOutline(W, cx, hw) {
@@ -1310,14 +1310,20 @@ function renderList() {
     return;
   }
 
+  // 報告者の表示名：メンバー設定の表示名。無ければメールアドレスの @ より前
+  const reporterName = (email) => { const e = String(email || "").toLowerCase(); return members?.names?.[e] || e.split("@")[0] || "（名前なし）"; };
+
   $("#reportList").innerHTML = list.map((r) => {
     const title = reportTitle(r);
     const result = itemVal(r.items, "result");
     const caseNo = firstOfType(r.items, ["caseNo"]);
-    const subs = [
+    // 1行目＝案件番号・場所、2行目＝数値（資金力・説明時間）と担当・受付
+    const placeRow = [
       caseNo && `<span class="case-no">${esc(caseNo)}</span>`,
       (() => { const v = visitOfReport(r); const ad = v ? addressOf(v) : ""; return ad && `${ic("home")}${esc(ad)}`; })(),
-      itemVal(r.items, "visitTo") && itemVal(r.items, "visitTo") !== title && `${ic("pin")}${esc(itemVal(r.items, "visitTo"))}`,
+      itemVal(r.items, "visitTo") && itemVal(r.items, "visitTo") !== title && `${ic("pin")}${esc(itemVal(r.items, "visitTo"))}`
+    ].filter(Boolean);
+    const numRow = [
       itemVal(r.items, "wealth") && `${ic("wallet")}資金力 ${esc(itemVal(r.items, "wealth"))}/10`,
       (() => { const e = explainItemOf(r.items); return e && `${ic("timer")}説明時間 ${esc(e.value)}${/^\d+(\.\d+)?$/.test(String(e.value).trim()) ? "分" : ""}`; })(),
       itemVal(r.items, "personName") && `${ic("user")}${esc(itemVal(r.items, "personName"))}`,
@@ -1329,25 +1335,8 @@ function renderList() {
     // 店舗名の隣に業種（訪問リストの案件番号からたどる）
     const industry = (() => { const v = visitOfReport(r); return v ? industryOf(v) : ""; })();
 
+    // 次回アクションの枠は表示しない（データは報告に残す）。中身は「詳細を表示」の中で見られる
     const na = naItemsOf(r);
-    const naDate = firstOfType(na, ["date", "datetime"]).slice(0, 10);
-    const naText = firstOfType(na, ["textarea", "text"]);
-    const naMaps = firstOfType(na, ["maps"]);
-    let due = "";
-    if (naDate) {
-      if (naDate < today()) due = `<span class="due over">期限切れ</span>`;
-      else if (naDate === today()) due = `<span class="due now">今日</span>`;
-    }
-    const naHtml = (naDate || naText || naMaps) ? `
-      <div class="na-box">
-        <div class="na-line"><strong>次回</strong>${naDate ? `<span>${esc(fmtDateJa(naDate))}</span>` : ""}${due}</div>
-        ${naText ? `<div class="na-text">${esc(naText)}</div>` : ""}
-        ${naMaps ? `<div class="btn-row">
-          <a class="btn small" href="${esc(naMaps)}" target="_blank" rel="noopener">地図を開く</a>
-          <button class="btn small" type="button" data-copy="${esc(naMaps)}">URLをコピー</button>
-          <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(naMaps))}">${ic("code")}Claude Code用の指示をコピー</button>
-        </div>` : ""}
-      </div>` : "";
 
     const actions = canModify(r) ? `
       <span class="btn-row" style="margin:0">
@@ -1360,13 +1349,16 @@ function renderList() {
     const details = itemsDl(rest) + (na.some((i) => i.value) ? `<p class="details-sub">次回アクション</p>${itemsDl(na)}` : "");
 
     return `<article class="card report-card">
+      <p class="report-by">報告者：<b>${esc(reporterName(r.authorEmail))}</b></p>
       <div class="report-head">
         <p class="report-title">${esc(title)}${industry ? ` <span class="tag cat">${esc(industry)}</span>` : ""}</p>
         ${result ? `<span class="badge ${RESULT_CLASS[result] || ""}">${esc(result)}</span>` : ""}
       </div>
-      ${subs.length ? `<p class="report-sub">${subs.join("<span class=\"sep\">·</span>")}</p>` : ""}
+      ${placeRow.length || numRow.length ? `<div class="report-meta">
+        ${placeRow.length ? `<p class="report-meta-row">${placeRow.join("")}</p>` : ""}
+        ${numRow.length ? `<p class="report-meta-row">${numRow.join("")}</p>` : ""}
+      </div>` : ""}
       ${demoHtml}
-      ${naHtml}
       ${details ? `<details class="report-details"><summary>詳細を表示</summary>${details}</details>` : ""}
       <div class="report-foot">
         <span>${esc(r.authorEmail)}・${fmtTs(r.createdAt)}</span>
@@ -2284,7 +2276,7 @@ function reportsOfCase(no) {
 }
 function visitStatus(v) {
   const rs = reportsOfCase(v.caseNo);
-  if (!rs.length) return { done: false, html: `<span class="badge st-todo pill-plate">未報告</span>` };
+  if (!rs.length) return { done: false, html: `<span class="badge st-todo">未報告</span>` };
   const latest = [...rs].sort((a, b) => tsNum(b.createdAt) - tsNum(a.createdAt))[0];
   const res = itemVal(latest.items, "result");
   return { done: true, result: res, html: `<span class="badge st-done ${RESULT_CLASS[res] || ""}">報告済み${res ? `・${esc(res)}` : ""}</span>` };
