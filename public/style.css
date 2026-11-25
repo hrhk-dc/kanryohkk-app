@@ -5,19 +5,28 @@
    ===================================================== */
 :root {
   color-scheme: dark;
-  /* 面 */
-  --bg: #000000;
-  --card: #161618;          /* カード */
-  --card-hi: #1e1e21;       /* カードのグラデーション上側 */
-  --tile: #242427;          /* カード内のタイル・入力欄・薄いボタン */
-  --tile-hi: #2e2e32;       /* ホバー */
+  /* 面（白の透明度で重ねる＝ガラス） */
+  --bg: #0b0d12;
+  --card: rgba(255, 255, 255, .07);       /* カード（白7%のガラス） */
+  --card-hi: rgba(255, 255, 255, .11);    /* カードのグラデーション上側 */
+  --card-solid: #15171d;                  /* 透けてはいけない所（固定した列など） */
+  --tile: rgba(255, 255, 255, .08);       /* ピル・入力欄・薄いボタン */
+  --tile-hi: rgba(255, 255, 255, .14);    /* ホバー */
   --line: rgba(255, 255, 255, .08);
-  /* 文字 */
-  --text: #f5f5f7;
-  --muted: #8e8e96;
-  --faint: #5c5c64;
-  /* アクセント（参考デザインの支出バーの5色） */
-  --violet: #6b2bff;
+  --scrim: rgba(11, 13, 18, .86);         /* 上のバーの背景 */
+  /* 文字（主要100% ／ 補助60% ／ 未選択70%） */
+  --text: #ffffff;
+  --sub: rgba(255, 255, 255, .7);
+  --muted: rgba(255, 255, 255, .6);
+  --faint: rgba(255, 255, 255, .42);
+  /* アクセント（シアン → バイオレット → マゼンタ。薄く・柔らかく、1画面で光るのは1か所だけ） */
+  --cyan: #00e5ff;
+  --violet: #7c5cff;
+  --magenta: #ff2e88;
+  --aurora: linear-gradient(135deg, var(--cyan), var(--violet) 52%, var(--magenta));
+  --aurora-soft: linear-gradient(135deg, rgba(0, 229, 255, .24), rgba(124, 92, 255, .30) 52%, rgba(255, 46, 136, .24));
+  --ring: linear-gradient(135deg, rgba(0, 229, 255, .55), rgba(124, 92, 255, .55) 52%, rgba(255, 46, 136, .55));
+  /* 状態の色（意味があるときだけ使う） */
   --coral: #ff5a5f;
   --green: #2ec27e;
   --yellow: #ffc83d;
@@ -325,7 +334,7 @@ fieldset.next-action legend { font-weight: 700; padding: 0 6px; }
 .mini-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
 /* デモサイトのリンク */
-.demo-url-link { font-size: 12px; word-break: break-all; align-self: center; color: #7fb6ff; }
+.demo-url-link { font-size: 12px; word-break: break-all; align-self: center; color: var(--sub); text-decoration: none; }
 
 /* 承認待ち・メンバー管理 */
 .member-add { display: grid; grid-template-columns: 1fr 120px auto; gap: 8px; align-items: center; margin: 8px 0 12px; }
@@ -440,11 +449,10 @@ body:not(.logged-in) .hidden-logged-out { display: none; }
    色は変数だけ。新しい変数はここで追加する。
    ===================================================== */
 :root {
-  --glass: rgba(18, 18, 21, .72);
-  --glass-line: rgba(255, 255, 255, .10);
+  --glass: rgba(20, 22, 30, .72);
+  --glass-line: rgba(255, 255, 255, .12);
   --shine: linear-gradient(160deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .03) 38%, rgba(255, 255, 255, .07));
-  --glow-violet: rgba(107, 43, 255, .20);
-  --glow-blue: rgba(47, 140, 255, .12);
+  --glow-violet: rgba(124, 92, 255, .16);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --shadow: 0 1px 0 rgba(255, 255, 255, .06) inset, 0 18px 40px -12px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .35);
   --radius: 26px;
@@ -452,8 +460,7 @@ body:not(.logged-in) .hidden-logged-out { display: none; }
 html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
 body {
   background:
-    radial-gradient(90% 46% at 50% -8%, var(--glow-violet), transparent 70%),
-    radial-gradient(70% 36% at 105% 2%, var(--glow-blue), transparent 70%),
+    radial-gradient(60% 34% at 50% 0%, var(--glow-violet), transparent 72%),
     var(--bg);
   background-repeat: no-repeat; background-attachment: fixed;
   font-feature-settings: "palt", "tnum";
@@ -464,7 +471,7 @@ body {
 .topbar {
   position: sticky; top: 0; z-index: 25; max-width: none;
   padding: calc(12px + env(safe-area-inset-top)) max(18px, calc((100% - 724px) / 2)) 12px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, .86), rgba(0, 0, 0, .55));
+  background: var(--scrim);
   backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
   border-bottom: 1px solid var(--line);
 }
@@ -673,3 +680,150 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 .ts-link:hover { color: var(--text); }
 @keyframes tsPop { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes tsFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* =====================================================
+   2026 UIリフレッシュ：ガラスのピル・グラデーションの光
+   ここから下が最終の決まり（上の同じ部品より後ろなので優先される）。
+   ===================================================== */
+
+/* ライトモード（変数だけ。まだ切り替えの画面はなく、data-theme="light" を付けた時だけ効く） */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f3f7;
+  --card: rgba(255, 255, 255, .72);
+  --card-hi: rgba(255, 255, 255, .92);
+  --card-solid: #ffffff;
+  --tile: rgba(11, 13, 18, .06);
+  --tile-hi: rgba(11, 13, 18, .11);
+  --line: rgba(11, 13, 18, .09);
+  --scrim: rgba(242, 243, 247, .88);
+  --text: #0b0d12;
+  --sub: rgba(11, 13, 18, .72);
+  --muted: rgba(11, 13, 18, .6);
+  --faint: rgba(11, 13, 18, .42);
+  --glass: rgba(255, 255, 255, .8);
+  --glass-line: rgba(11, 13, 18, .1);
+  --glow-violet: rgba(124, 92, 255, .10);
+}
+
+/* 線のアイコン：1.5px。選択中のタブは明るい水色がかった白＋柔らかい青いグロー */
+.ic { stroke-width: 1.5; }
+label { color: var(--sub); }
+.tab { color: var(--sub); }
+.tab svg { stroke-width: 1.5; }
+.tab.active { color: #eafcff; font-weight: 700; background: none; box-shadow: none; }
+.tab.active svg { color: #eafcff; stroke-width: 1.5; transform: none; filter: drop-shadow(0 0 6px rgba(0, 229, 255, .55)); }
+.tabs { border-radius: 999px; }
+.tab { border-radius: 999px; }
+
+/* 上のバー：ガラスのピルボタン */
+.topbar-actions .btn { border-radius: 999px; }
+.topbar-actions .btn.ghost { background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.topbar-actions .btn.ghost:hover { background: var(--tile-hi); }
+.topbar-actions .btn:disabled { opacity: .35; }
+.topbar-actions .btn:disabled:hover { filter: none; transform: none; }
+#undoBtn, #redoBtn { width: 40px; height: 40px; min-height: 40px; }
+#installBtn { background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--ring) border-box; border: 1.5px solid transparent; color: var(--text); box-shadow: none; }
+
+/* ボタン：角丸16px。メインは薄いグラデーションの枠（白地は使わない） */
+.btn { border-radius: 16px; }
+.btn.primary {
+  background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--ring) border-box;
+  border: 1.5px solid transparent; color: var(--text);
+  box-shadow: 0 10px 26px -12px rgba(124, 92, 255, .55);
+}
+.btn.primary:hover { background: linear-gradient(var(--tile-hi), var(--tile-hi)) padding-box, var(--ring) border-box; filter: brightness(1.1); }
+.btn.ghost { border-radius: 16px; }
+.btn.danger { background: rgba(255, 90, 95, .14); color: #ff8a8e; }
+.btn:focus-visible, .tab:focus-visible, .seg-btn:focus-visible, .sub-tab:focus-visible, .pc-chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* 切り替え：選択中はグラデーションの光＋白文字（白いピルは使わない） */
+.seg, .auth-tabs { border-radius: 999px; }
+.seg-btn, .auth-tab { border-radius: 999px; color: var(--sub); }
+.seg-btn.active, .auth-tab.active, .sub-tab.active, .pc-chip.active {
+  background: var(--aurora-soft); color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, .5), 0 0 18px -2px rgba(124, 92, 255, .5);
+}
+.sub-tab { border-radius: 999px; background: var(--tile); color: var(--sub); }
+.sub-tab:hover:not(.active) { background: var(--tile-hi); }
+.pc-chip { border-radius: 999px; background: var(--tile); color: var(--text); }
+.pc-chip.active b { color: var(--cyan); }
+.pc-chip b { color: var(--text); }
+
+/* フィルター（担当・業種・状態）：ガラスのピルに、薄いグラデーションの枠 */
+.sched-filters select, .tool-row select {
+  border-radius: 999px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23d0d0d8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px,
+    linear-gradient(var(--card-solid), var(--card-solid)) padding-box,
+    var(--ring) border-box;
+  border: 1.5px solid transparent;
+}
+
+/* 訪問カード：白7%のガラス・角丸20px・薄いグラデーションの枠 */
+.visit-item { border-radius: 20px; padding: 16px 18px; background: linear-gradient(160deg, var(--card-hi), var(--card) 60%); }
+.visit-item::before { background: var(--ring); }
+/* 並び順：日時 → 店名（幅いっぱい） → 地域・業種 → 担当・ボタン */
+.visit-item { display: flex; flex-wrap: wrap; }
+.visit-item > * { width: 100%; }
+.visit-item > .visit-sub { order: 0; }
+.visit-item > .report-head { order: 1; }
+.visit-item > .tags { order: 2; }
+.visit-item > .visit-hours { order: 3; }
+.visit-item > .visit-status { order: 4; }
+.visit-item > .report-items { order: 5; }
+.visit-item > .report-details { order: 6; }
+.visit-item > .report-foot { order: 7; }
+.visit-item .report-title { font-size: 18px; width: auto; flex: 1 1 auto; min-width: 0; }
+.visit-item .vtime, .visit-item .vdate { font-size: 13px; color: var(--sub); }
+.vtime { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 999px; background: var(--tile); box-shadow: inset 0 0 0 1px var(--glass-line); color: var(--text); font-weight: 600; }
+.vtime select, .vtime .time-btn { border-radius: 999px; }
+.vdate { color: var(--sub); }
+
+/* 案件番号：グラデーションの枠線だけ（塗りつぶさない） */
+.case-no {
+  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--aurora) border-box;
+  border: 1.5px solid transparent; border-radius: 999px; padding: 1px 11px;
+  color: var(--text); box-shadow: none;
+}
+/* 未報告：グラデーションの枠（金色は使わない） */
+.badge.st-todo {
+  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--aurora) border-box;
+  border: 1.5px solid transparent; color: var(--text); box-shadow: none;
+}
+.badge.st-done.ok, .badge.ok { border-radius: 999px; }
+
+/* 訪問カード・予定の行のボタン：地図／デモサイト／デモURLをコピー＝ガラスのピル */
+.visit-item .btn, .mini-row .btn { border-radius: 999px; }
+.visit-item .btn:not(.primary):not(.danger), .mini-row .btn:not(.primary):not(.danger) {
+  background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line);
+}
+.visit-item .btn:not(.primary):not(.danger):hover, .mini-row .btn:not(.primary):not(.danger):hover { background: var(--tile-hi); }
+/* 報告する：最重要なので、シアン→マゼンタのグラデーションのピル */
+.visit-item .btn.primary, .mini-row .btn.primary, .visit-item .btn.primary:hover, .mini-row .btn.primary:hover {
+  background: var(--aurora); border: 0; color: #0b0d12; font-weight: 700;
+  box-shadow: 0 8px 22px -8px rgba(255, 46, 136, .55), 0 0 18px -6px rgba(0, 229, 255, .45);
+}
+.demo-url-link { color: var(--sub); text-decoration: none; }
+.demo-url-link:hover { color: var(--text); }
+
+/* 予定の行：時刻ピル（ガラス）→ 案件番号 → 店名（次の行で幅いっぱい）→ 地域・業種・担当 */
+.mini-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mini-title b { display: inline-block; margin: 0; padding: 3px 11px; border-radius: 999px; background: var(--tile); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); font-size: 13px; }
+.mini-title .case-no { order: 1; margin-left: auto; }
+.mini-date { font-size: 13px; color: var(--sub); font-weight: 500; }
+.mini-shop { order: 2; flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+.mini-row { padding: 14px 6px; }
+.mini-row:hover { background: var(--tile); }
+
+/* 集計・その他の面 */
+.bar { background: var(--aurora); }
+.stats-summary div { border-radius: 20px; }
+.ph-x { background: var(--tile-hi); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line); }
+
+/* 一時のメッセージ・引いて更新：ガラス（白のベタ塗りは使わない） */
+.toast { background: var(--glass); color: var(--text); box-shadow: inset 0 0 0 1px var(--glass-line), 0 12px 30px rgba(0, 0, 0, .5); }
+#pullIndicator.ready { background: var(--aurora-soft); color: var(--text); }
+
+/* 黄色の注意は、枠を薄く残す程度に抑える */
+.dup-alert { border-radius: 16px; }
+@media (prefers-reduced-motion: reduce) { .tab.active svg { transition: none; } }
