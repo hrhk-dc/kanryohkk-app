@@ -1213,8 +1213,8 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 }
 .pc-chip b, .pc-chip.active b { color: inherit !important; }
 
-/* 表示だけのラベル（グレー・平ら）：案件番号・時間・ステータス・業種・結果バッジ・件数 */
-.case-no, .badge, .tag, .due, .vtime, .vdate, .mini-title b, .lc-won, .auto-tag {
+/* 表示だけのラベル（グレー・平ら）：時間・ステータス・業種・結果バッジ・件数（案件番号は除く。Round 7 で純黒の塗りに） */
+.badge, .tag, .due, .vtime, .vdate, .mini-title b, .lc-won, .auto-tag {
   background: var(--k-grey) !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -1238,3 +1238,97 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
   color: var(--text) !important; cursor: pointer; list-style: none;
 }
 .report-details > summary::-webkit-details-marker { display: none; }
+
+/* ================================================================
+   Round 7（v58）
+   1. 成約バッジ（.badge.ok）のみ金色：濃い黒＋金色の縁＋金色の文字。
+      他のバッジ（検討中・断り・未報告・報告済み）はグレーのまま。
+   2. 案件番号ピル（.case-no）：背景だけ純黒（#0b0d12）。虹色・カラーの縁は付けない
+      （Round 7 訂正版。ベースの虹色の縁が復活しないよう単色で上書きする）。
+   3. 資金力行（2行目）：1行に収める。各項目を #1a1c23 の小さいグレーのピルに包む。
+   4. ボトムナビ：塗りを約半分の不透明度にする（SVG の nvFill も index.html で半分に）。
+   5. ボトムナビの選択中ラベル：ネオンの水色＋グロー。
+   6. 日付切替：選択中のみ虹色の縁。未選択は純黒・縁なし。
+   ================================================================ */
+:root {
+  /* 金色（成約バッジの縁。金 → 温かい琥珀 → 柔らかいシャンパン） */
+  --gold: #ffd75e;
+  --gold-amber: #e8a33d;
+  --gold-champagne: #f9e7b8;
+  --gold-text: #ffe9a8;
+  --gold-ring: linear-gradient(135deg, #ffd75e, #e8a33d 52%, #f9e7b8);
+}
+
+/* 1. 成約バッジだけ金色（他のバッジはグレーのまま） */
+.badge.ok, .badge.st-done.ok {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--gold-ring) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--gold-text) !important;
+  box-shadow: 0 0 12px rgba(255, 200, 80, .28) !important;
+}
+
+/* 2. 案件番号ピル：背景だけ純黒。虹色・カラーの縁なし */
+.case-no, .pill-plate .case-no {
+  background: var(--k-black) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--text);
+}
+
+/* 3. 資金力行（2行目）：1行に収める。各項目をグレーの小さいピルに包み、アイコンと文字を詰める */
+.report-meta-row.num-row {
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+.report-meta-row.num-row > span {
+  background: var(--k-grey);
+  border-radius: 999px;
+  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.report-meta-row.num-row .ic {
+  margin-right: 0;
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+@media (max-width: 480px) {
+  .report-meta-row.num-row {
+    font-size: 11px;
+  }
+  .report-meta-row.num-row > span {
+    padding: 2px 6px;
+  }
+  .report-meta-row.num-row .ic {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* 4. ボトムナビ：塗りは SVG（nvFill）の方で半分にする。ここは透明のまま（アーチ層の意図通り） */
+.tabs {
+  background: none !important;
+}
+
+/* 5. ボトムナビの選択中ラベル：ネオンの水色＋グロー。未選択はグレーのまま。アイコンは白のまま */
+.tab.active span {
+  color: #7dd3ff;
+  text-shadow: 0 0 8px rgba(0, 229, 255, .55), 0 0 18px rgba(125, 211, 255, .35);
+}
+
+/* 6. 日付切替：選択中は明るいネオンの塗りを残し、虹色の縁を追加。未選択は純黒・縁なし */
+#todaySeg .seg-btn.active {
+  background: linear-gradient(135deg, #00e5ff, #7c5cff 52%, #ff2e88) padding-box, var(--k-ring) border-box !important;
+  border: 1.5px solid transparent !important;
+}
+#todaySeg .seg-btn:not(.active) {
+  background: var(--k-black) !important;
+  border: 1.5px solid rgba(255, 255, 255, .08) !important;
+  box-shadow: none !important;
+}
