@@ -817,7 +817,7 @@ function showTab(name) {
 /* ---------- 下のナビの輪郭（ピル＋選択タブの低い丘を1本のSVGパスで） ----------
    縁・塗り・内側の光は同じ輪郭を共有するので、縁のグラデーションは途切れず一周し、
    選んだタブの丘は棒に溶け込む。丘は低く幅広い（高さ約10px・裾は約2タブ分）。 */
-const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 10, NAV_LOGO = 56;
+const NAV_PAD = 24, NAV_H = 72, NAV_BUMP = 10;
 let navCx = null, navAnim = null, navTarget = null;
 const navReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function navOutline(W, cx, bwL, bwR) {
@@ -833,11 +833,10 @@ function drawNav(cx) {
   const W = nav.clientWidth;
   if (!active || !W || !active.offsetWidth) return;
   const want = active.offsetWidth, r = NAV_H / 2;
-  // 端のタブでは、外側の裾は縮め、内側の裾だけを広げる（ロゴの丸ボタンの上・角の丸みには載せない）
-  const lo = NAV_LOGO + 4, hi = W - r;
-  cx = Math.max(lo + 14, Math.min(hi - 28, cx));
-  const bwL = Math.max(14, Math.min(want, cx - lo));
-  const bwR = Math.max(14, Math.min(want, hi - cx));
+  // 丘の頂点は、選択タブの中心（アイコンの中心）に必ず置く。端のタブでは外側の裾だけを縮める
+  const lo = r, hi = W - r;
+  const bwL = Math.max(10, Math.min(want, cx - lo));
+  const bwR = Math.max(10, Math.min(want, hi - cx));
   const d = navOutline(W, cx, bwL, bwR), set = (id, a) => { const e = $("#" + id); for (const k in a) e.setAttribute(k, a[k]); };
   ["navFill", "navRim", "navRimGlow", "navClipPath"].forEach((id) => set(id, { d }));
   const avg = (bwL + bwR) / 2;
