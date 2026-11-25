@@ -1319,8 +1319,8 @@ function renderList() {
     // 1行目＝案件番号・場所、2行目＝数値（資金力・説明時間）と担当・受付
     const placeRow = [
       caseNo && `<span class="case-no">${esc(caseNo)}</span>`,
-      (() => { const v = visitOfReport(r); const ad = v ? addressOf(v) : ""; return ad && `${ic("home")}${esc(ad)}`; })(),
-      itemVal(r.items, "visitTo") && itemVal(r.items, "visitTo") !== title && `${ic("pin")}${esc(itemVal(r.items, "visitTo"))}`
+      (() => { const v = visitOfReport(r); const ad = v ? addressOf(v) : ""; return ad && `<span class="meta-item">${ic("home")}${esc(ad)}</span>`; })(),
+      itemVal(r.items, "visitTo") && itemVal(r.items, "visitTo") !== title && `<span class="meta-item">${ic("pin")}${esc(itemVal(r.items, "visitTo"))}</span>`
     ].filter(Boolean);
     const numRow = [
       itemVal(r.items, "wealth") && `${ic("wallet")}資金力 ${esc(itemVal(r.items, "wealth"))}/10`,
@@ -1355,8 +1355,8 @@ function renderList() {
         ${result ? `<span class="badge ${RESULT_CLASS[result] || ""}">${esc(result)}</span>` : ""}
       </div>
       ${placeRow.length || numRow.length ? `<div class="report-meta">
-        ${placeRow.length ? `<p class="report-meta-row">${placeRow.join("")}</p>` : ""}
-        ${numRow.length ? `<p class="report-meta-row num-row">${numRow.map((s) => `<span>${s}</span>`).join("")}</p>` : ""}
+        ${placeRow.length ? `<p class="report-meta-row place-row">${placeRow.join("")}</p>` : ""}
+        ${numRow.length ? `<p class="report-meta-row num-row">${numRow.map((s) => `<span class="meta-item">${s}</span>`).join("")}</p>` : ""}
       </div>` : ""}
       ${demoHtml}
       ${details ? `<details class="report-details"><summary>詳細を表示</summary>${details}</details>` : ""}
