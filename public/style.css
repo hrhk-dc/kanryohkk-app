@@ -1332,3 +1332,46 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
   border: 1.5px solid rgba(255, 255, 255, .08) !important;
   box-shadow: none !important;
 }
+
+/* ================================================================
+   Round 8（v60）
+   1. ボトムナビの塗り：index.html の nvFill を元の約70〜75%に戻した（.47→.68、.48→.69）。
+      .tabs は透明のまま（ここでは触らない）。
+   2. 選択中のアイコン：ネオンの水色（#7DD3FF）＋柔らかいグロー。未選択はグレーの細い線のまま。
+   3. ログインの切り替え（.auth-tab）と 4. 日付切替（#todaySeg）を同じ見た目にする。
+      選択中・押下中＝明るいネオン（シアン→バイオレット→マゼンタ）＋白文字＋虹色の縁。
+      未選択＝グレーのフラット（--k-grey、影なし・縁なし）。押すと scale .97 に縮む。
+   ================================================================ */
+
+/* 2. 選択中のアイコン：白ではなくネオンの水色＋グロー（ラベルと同じ色） */
+.tab.active svg {
+  color: #7dd3ff;
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, .65)) drop-shadow(0 0 10px rgba(0, 229, 255, .35));
+}
+:root[data-theme="light"] .tab.active svg { color: #0b2a4a; }
+
+/* 3・4. 切り替えの感触（ログイン・日付で共通） */
+.auth-tab, #todaySeg .seg-btn {
+  transition: background .2s, color .2s, box-shadow .2s, transform .12s var(--ease);
+}
+
+/* 未選択：グレーのフラット（押せるが、影も虹色の縁もなし） */
+.auth-tab:not(.active), #todaySeg .seg-btn:not(.active) {
+  background: var(--k-grey) !important;
+  border: 1.5px solid transparent !important;
+  box-shadow: none !important;
+  color: var(--sub) !important;
+}
+.auth-tab:not(.active):hover, #todaySeg .seg-btn:not(.active):hover { color: var(--text) !important; }
+
+/* 選択中・押下中：明るいネオン＋白文字＋虹色の縁（日付ピルの選択中と同じ） */
+.auth-tab.active, .auth-tab:active, #todaySeg .seg-btn.active, #todaySeg .seg-btn:active {
+  background: linear-gradient(135deg, #00e5ff, #7c5cff 52%, #ff2e88) padding-box, var(--k-ring) border-box !important;
+  border: 1.5px solid transparent !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 14px rgba(0, 229, 255, .55), 0 0 22px rgba(255, 46, 136, .4) !important;
+}
+
+/* 押したとき：わずかに縮む（ボタンと同じ 0.97） */
+.auth-tab:active, #todaySeg .seg-btn:active { transform: scale(.97); }
