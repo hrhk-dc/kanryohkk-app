@@ -411,6 +411,7 @@ const drafts = {};
 let adminSection = "report";
 let reports = [];
 let visits = [];
+let mlAllVisits = []; // 後で訪問（ml_later）も含む、全部の訪問。完了報告の画面の visits からは後で訪問を外す
 let editingId = null;
 let editingVisitId = null;
 let visitRows = [];
@@ -691,7 +692,9 @@ function subscribe() {
   }, (err) => showBanner(err, "報告一覧の読み込み")));
 
   unsubs.push(onSnapshot(query(collection(db, "visits"), orderBy("createdAt", "desc")), (snap) => {
-    visits = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    mlAllVisits = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    visits = mlAllVisits.filter((v) => !isLaterVisit(v)); // 後で訪問（ml_later）は完了報告の画面に出さない
+    migrateLaterFromLocal();
     applyDemoUrls();
     renderList();
     renderVisitList();
@@ -3097,35 +3100,81 @@ function buildShopItems(s) {
   ];
 }
 
-// 店の id（Googleの場所ID）か、訪問の id から、完了報告の訪問を探す
-const bridgeDoc = (id) => visits.find((v) => v.id === id || (v.items || []).some((i) => i.id === "ml_placeId" && i.value === id));
+// 後で訪問：visits の項目に ml_later の印を付ける（完了報告の画面では出さない）
+const isLaterVisit = (v) => (v.items || []).some((i) => i.id === "ml_later");
+const LATER_ITEM = { id: "ml_later", label: "後で訪問", type: "text", value: "1" };
+const LATER_LOCAL = "vla:later"; // 以前の端末内の「後で訪問」（一度だけ visits に移す）
+
+// 店の id（Googleの場所ID）か、訪問の id から、完了報告の訪問を探す（後で訪問も含む全部から）
+const bridgeDoc = (id) => mlAllVisits.find((v) => v.id === id || (v.items || []).some((i) => i.id === "ml_placeId" && i.value === id));
+const visitItem = (v) => { const shop = shopFromVisit(v); return { id: shop.id, shop, visitDate: v.visitDate || "" }; };
+
+// 店を visits に作る。書類の番号は場所IDから決めて、同じ店が二重に入らないようにする（別の端末から入れても）
+async function createVisitFromShop(shop, visitDate, later) {
+  const ref = doc(db, "visits", "ml_" + encodeURIComponent(String(shop.id)));
+  const counterRef = doc(db, "counters", "caseNo");
+  return runTransaction(db, async (tx) => {
+    const exists = await tx.get(ref);
+    if (exists.exists()) return false;
+    const snap = await tx.get(counterRef);
+    const last = snap.exists() ? (snap.data().last || 0) : 0;
+    const items = buildShopItems(shop);
+    if (later) items.push({ ...LATER_ITEM });
+    tx.set(counterRef, { last: last + 1, updatedAt: serverTimestamp() });
+    tx.set(ref, {
+      caseNo: fmtCaseNo(last + 1), visitDate: visitDate || "", items, order: 0,
+      authorUid: currentUser.uid,
+      authorEmail: currentUser.email,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  });
+}
+
+// 以前の端末内の「後で訪問」を、一度だけ visits に移す（移せたら端末内の分は消す）
+let laterMigrated = false;
+async function migrateLaterFromLocal() {
+  if (laterMigrated || !currentUser) return;
+  let list = null;
+  try { list = JSON.parse(localStorage.getItem(LATER_LOCAL) || "null"); } catch (e) { list = null; }
+  if (!Array.isArray(list)) { laterMigrated = true; return; }
+  try {
+    for (const it of list) {
+      if (it && it.shop && it.shop.id) await createVisitFromShop(it.shop, it.visitDate || "", true);
+    }
+    localStorage.removeItem(LATER_LOCAL);
+    laterMigrated = true;
+  } catch (e) { console.warn("後で訪問の移行をもう一度行います", e); }
+}
 
 window.dcVisitBridge = {
-  // 訪問リストの一覧（完了報告の visits と同じ。手で入れた訪問も含む）
+  // 訪問リストの一覧（完了報告の visits と同じ。手で入れた訪問も含む。後で訪問は入らない）
   list() {
-    return visits.map((v) => {
-      const shop = shopFromVisit(v);
-      return { id: shop.id, shop, visitDate: v.visitDate || "" };
-    });
+    return visits.map(visitItem);
+  },
+
+  // 後で訪問の一覧（visits のうち ml_later の印が付いたもの）
+  laterList() {
+    return mlAllVisits.filter(isLaterVisit).map(visitItem);
   },
 
   // 店を訪問リストに入れる（案件番号は完了報告と同じ共通の連番）
   async add(shop, visitDate) {
     if (!currentUser) throw new Error("訪問リストに入れるには、ログインしてください");
     if (bridgeDoc(shop.id)) return; // 入っている店は重ねて入れない
-    const counterRef = doc(db, "counters", "caseNo");
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      const last = snap.exists() ? (snap.data().last || 0) : 0;
-      tx.set(counterRef, { last: last + 1, updatedAt: serverTimestamp() });
-      tx.set(doc(collection(db, "visits")), {
-        caseNo: fmtCaseNo(last + 1), visitDate: visitDate || "", items: buildShopItems(shop), order: 0,
-        authorUid: currentUser.uid,
-        authorEmail: currentUser.email,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    });
+    await createVisitFromShop(shop, visitDate, false);
+  },
+
+  // 後で訪問に移す（on=true）／訪問リストに戻す（on=false）。訪問日はそのまま残す
+  async setLater(id, on) {
+    const v = bridgeDoc(id);
+    if (!v) throw new Error("この訪問が見つかりません。画面を読み直してください");
+    if (isLaterVisit(v) === !!on) return;
+    const base = (v.items || []).filter((i) => i.id !== "ml_later");
+    const items = on ? [...base, { ...LATER_ITEM }] : base;
+    await updateDoc(doc(db, "visits", v.id), { items, updatedAt: serverTimestamp(), updatedBy: currentUser.email });
+    historyUpdate("visits", v, ["items"], { items }, on ? "後で訪問に移す（マップリスト）" : "訪問リストに戻す（マップリスト）");
   },
 
   // 訪問日を変える（空にすると「日付未定」）

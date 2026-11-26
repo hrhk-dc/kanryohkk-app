@@ -214,7 +214,10 @@
     // 実体は完了報告アプリの画面の処理（app.js の window.dcVisitBridge）。ここは窓口だけ
     visits: {
       list: () => (window.dcVisitBridge ? window.dcVisitBridge.list() : []),
+      // 後で訪問も visits の中（ml_later の印）。完了報告の画面には出ない
+      laterList: () => (window.dcVisitBridge ? window.dcVisitBridge.laterList() : []),
       add: (shop, visitDate) => window.dcVisitBridge.add(shop, visitDate),
+      setLater: (id, on) => window.dcVisitBridge.setLater(id, on),
       setDate: (id, visitDate) => window.dcVisitBridge.setDate(id, visitDate),
       remove: (id) => window.dcVisitBridge.remove(id),
     },

@@ -60,7 +60,13 @@ export const getDocsFromServer = async () => emptySnap;
 export const runTransaction = async (db, fn) => {
   const writes = [];
   const tx = {
-    get: async (ref) => ({ exists: () => true, data: () => ({ last: COUNTER.last }) }),
+    // 本物と同じに：カウンターは常にある。書類は、今ある訪問の中に同じ id があるかで決まる
+    get: async (ref) => {
+      if (ref.path.startsWith('counters/')) return { exists: () => true, data: () => ({ last: COUNTER.last }) };
+      const id = ref.path.split('/').pop();
+      const found = VISITS.find((x) => x.id === id);
+      return { exists: () => !!found, data: () => { const { id: _i, ...rest } = found || {}; return rest; } };
+    },
     set: (ref, data) => writes.push({ ref, data }),
   };
   const out = await fn(tx);
@@ -260,6 +266,21 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
       return [...sr.querySelectorAll('#lList .shop-name')].map((e) => e.textContent.trim());
     });
     ok('もう一度マップリスト：訪問リストが残っている（読み直しなし）', again.includes('テスト寿司店'), JSON.stringify(again));
+
+    // 窓口：同じ店を2回入れても1件（場所IDで書類を決める）・後で訪問の往復（ml_later の印）
+    const bridge = async (fn) => page.evaluate(fn);
+    await bridge(async () => { const shop = { id: 'place-A', name: 'テスト寿司店', industry: '寿司・割烹', address: '東京都テスト区1-1', hours: {}, rating: 4.4 }; await window.dcVisitBridge.add(shop, ''); await window.dcVisitBridge.add(shop, ''); });
+    await page.waitForTimeout(300);
+    const dup = await bridge(() => window.dcVisitBridge.list().filter((x) => x.id === 'place-A').length);
+    ok('窓口：同じ店を2回入れても、訪問リストは1件', dup === 1, String(dup));
+    await bridge(() => window.dcVisitBridge.setLater('place-A', true));
+    await page.waitForTimeout(300);
+    const later1 = await bridge(() => ({ list: window.dcVisitBridge.list().map((x) => x.id), later: window.dcVisitBridge.laterList().map((x) => x.id) }));
+    ok('後で訪問に移す：訪問リストから外れ、後で訪問に入る', !later1.list.includes('place-A') && later1.later.includes('place-A'), JSON.stringify(later1));
+    await bridge(() => window.dcVisitBridge.setLater('place-A', false));
+    await page.waitForTimeout(300);
+    const later2 = await bridge(() => ({ list: window.dcVisitBridge.list().map((x) => x.id), later: window.dcVisitBridge.laterList().map((x) => x.id) }));
+    ok('訪問リストに戻す：訪問リストに戻り、後で訪問からは外れる', later2.list.includes('place-A') && !later2.later.includes('place-A'), JSON.stringify(later2));
 
     ok('コンソールエラーなし', errors.length === 0, errors.join(' | '));
   } finally {
