@@ -920,12 +920,14 @@ function layoutNav(animate) {
     || (navigator.connection && navigator.connection.saveData);
   if (weak) document.documentElement.classList.add("lowfx");
 })();
-// 下にスクロールで下のタブを隠し、上にスクロールで出す（一番下に着いても隠れたまま）
-// 上のバーは、下にスクロールしたら隠し、一番上に戻ったときだけ出す
+// 下にスクロールすると、下のタブと上のバーがゆっくり隠れる。少し（3px）上に動かすだけで、両方ゆっくり出る。
+// 一番下に着いても下のタブは出さない。一番上では必ず出す。完了報告・マップリストの両方で同じ動き。
+// 下のタブが隠れている間は、マップリストの「提案リストを作る」ボタンを下へずらす（--dock-drop）
 (() => {
   const nav = document.querySelector(".tabs");
   const top = document.querySelector(".topbar");
   if (!nav) return;
+  const SENS = 3; // 動きの大きさ（px）。これより大きく動いたら反応する
   let lastY = window.scrollY, ticking = false;
   window.addEventListener("scroll", () => {
     if (ticking) return;
@@ -934,17 +936,22 @@ function layoutNav(animate) {
       const y = Math.max(0, window.scrollY);
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const dy = y - lastY;
-      top?.classList.toggle("hide", y > 24);
-      if (y < 40) nav.classList.remove("hide"); // 一番上では出す
+      // 上のバー：下へ動いたら隠し、上へ少しでも動いたら出す（一番上では出す）
+      if (y < 24) top?.classList.remove("hide");
+      else if (dy > SENS) top?.classList.add("hide");
+      else if (dy < -SENS) top?.classList.remove("hide");
+      // 下のタブ：同じ動き（一番上では出す。一番下に着いたときは今の状態のまま）
+      if (y < 40) nav.classList.remove("hide");
       else if (y >= max - 4) { /* 一番下では今の状態のまま（出さない） */ }
-      else if (dy > 8) nav.classList.add("hide");
-      else if (dy < -8) nav.classList.remove("hide");
-      if (Math.abs(dy) > 8) lastY = y;
+      else if (dy > SENS) nav.classList.add("hide");
+      else if (dy < -SENS) nav.classList.remove("hide");
+      document.documentElement.style.setProperty("--dock-drop", nav.classList.contains("hide") ? "74px" : "0px");
+      if (Math.abs(dy) > SENS) lastY = y;
       ticking = false;
     });
   }, { passive: true });
 })();
-document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+document.querySelectorAll(".tab:not(.ml-tab)").forEach((t) => t.addEventListener("click", () => {
   if ((t.dataset.tab === "admin" || t.dataset.tab === "stats") && !isAdmin()) return;
   showTab(t.dataset.tab);
 }));
@@ -3026,9 +3033,44 @@ window.dcSwitchApp = async function (mode) {
     b.setAttribute("aria-selected", String(on));
   });
   setAppTitle(mode);
+  setTabsMode(mode);
   setMenu(false);
   window.scrollTo(0, 0); // 画面は再読み込みしない（同じページの中で切り替える）
 };
+
+/* 下のタブの棒は、完了報告とマップリストで同じもの（#mainNav）。
+   マップリストのときは棒を body に出し、完了報告の6つは隠して、マップリストの4つを出す */
+let mlTabName = "search"; // マップリストで選ばれている画面
+let dcTabName = "today";  // 完了報告で選ばれているタブ（戻ったときに使う）
+function setTabsMode(mode) {
+  const nav = document.getElementById("mainNav");
+  if (!nav) return;
+  if (mode === "ml") {
+    const cur = nav.querySelector(":scope > .tab.active:not(.ml-tab)")?.dataset.tab;
+    if (cur) dcTabName = cur;
+    nav.querySelectorAll(":scope > .tab:not(.ml-tab)").forEach((b) => b.classList.remove("active"));
+    document.body.appendChild(nav);
+    setMlActive(mlTabName);
+  } else {
+    document.getElementById("tab-today")?.before(nav);
+    showTab(dcTabName); // 完了報告に戻るときは、離れたタブを開き直す
+  }
+  requestAnimationFrame(() => layoutNav(true));
+}
+function setMlActive(name) {
+  mlTabName = name;
+  document.querySelectorAll("#mainNav .ml-tab").forEach((b) => b.classList.toggle("active", b.dataset.mlNav === name));
+  requestAnimationFrame(() => layoutNav(true));
+}
+// 下のタブ（マップリストの4つ）を押したら、マップリストの画面を切り替える
+document.getElementById("mainNav")?.addEventListener("click", (e) => {
+  const b = e.target.closest(".ml-tab");
+  if (!b || curApp !== "ml" || !window.mlActions) return;
+  setMlActive(b.dataset.mlNav);
+  window.mlActions.go(b.dataset.mlNav);
+});
+// マップリストの中で画面が変わったら（上のボタンなど）、下のタブの印も合わせる
+window.addEventListener("ml-screen", (e) => { if (curApp === "ml") setMlActive(e.detail); });
 document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
   b.addEventListener("click", () => window.dcSwitchApp(b.dataset.app));
 });
