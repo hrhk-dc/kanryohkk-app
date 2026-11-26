@@ -162,7 +162,7 @@
       <!-- マップリストの下のタブ（同じ棒・同じ見た目。マップリストのモードのときだけ出す。切り替えは app.js） -->
       <button class="tab ml-tab" type="button" data-ml-nav="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>検索</span></button>
       <button class="tab ml-tab" type="button" data-ml-nav="proposal"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg><span>提案リスト</span></button>
-      <button class="tab ml-tab" type="button" data-ml-nav="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><circle cx="4" cy="6.5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="17.5" r="1"/></svg><span>訪問リスト</span></button>
+      <button class="tab ml-tab" type="button" data-ml-nav="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><circle cx="4" cy="6.5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="17.5" r="1"/></svg><span>訪問予定</span></button>
       <button class="tab ml-tab" type="button" data-ml-nav="later"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>後で訪問</span></button>
     </nav>
 
@@ -501,14 +501,14 @@
       <div id="pList"></div>
       <div class="dock two">
         <button class="btn" data-act="go-search">条件を変えてもう一度</button>
-        <button class="btn primary" data-act="go-list">訪問リストを見る</button>
+        <button class="btn primary" data-act="go-list">訪問予定を見る</button>
       </div>
     </section>
 
-    <!-- 訪問リスト（完了報告アプリの訪問リストと同じもの） -->
-    <section class="screen" data-screen="list" aria-label="訪問リスト">
+    <!-- 訪問予定（マップリストから入れた訪問。データは完了報告アプリの visits と同じ） -->
+    <section class="screen" data-screen="list" aria-label="訪問予定">
       <header class="page-head">
-        <h1>訪問リスト</h1>
+        <h1>訪問予定</h1>
         <div class="head-actions">
           <button class="btn small" data-act="copy-all" data-src="visit">全部のリンクをコピー</button>
           <button class="btn small" data-act="go-dc">完了報告へ</button>

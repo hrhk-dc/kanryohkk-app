@@ -77,7 +77,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
         navStyle: { bg: getComputedStyle(nav).backgroundColor, pos: getComputedStyle(nav).position },
       };
     });
-    ok('マップリスト：下のタブは4つ（検索・提案リスト・訪問リスト・後で訪問）', ml.labels.join('/') === '検索/提案リスト/訪問リスト/後で訪問', JSON.stringify(ml.labels));
+    ok('マップリスト：下のタブは4つ（検索・提案リスト・訪問予定・後で訪問）', ml.labels.join('/') === '検索/提案リスト/訪問予定/後で訪問', JSON.stringify(ml.labels));
     ok('マップリスト：棒は完了報告と同じ要素（body に出る・固定）', ml.inBody && ml.navStyle.pos === 'fixed', JSON.stringify(ml.navStyle));
     ok('マップリスト：最初の画面（検索）が選ばれている', ml.active.join() === '検索', ml.active.join());
     await page.screenshot({ path: `${SHOTS}/r17-ml-tabs.png` });
@@ -88,7 +88,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       screen: document.getElementById('mlHost').shadowRoot.querySelector('.screen.active')?.dataset.screen || '',
       active: [...document.querySelectorAll('#mainNav .ml-tab.active')].map((b) => b.dataset.mlNav),
     }));
-    ok('マップリスト：下のタブで「訪問リスト」の画面に切り替わり、印も移る', afterTab.screen === 'list' && afterTab.active.join() === 'list', JSON.stringify(afterTab));
+    ok('マップリスト：下のタブで「訪問予定」の画面に切り替わり、印も移る', afterTab.screen === 'list' && afterTab.active.join() === 'list', JSON.stringify(afterTab));
 
     // 5) マップリストのモードでも、同じ動き（隠れて、少し上で出る。上のバーも）
     await page.evaluate(() => document.querySelector('#mainNav [data-ml-nav="search"]').click()); await wait(page, 400);

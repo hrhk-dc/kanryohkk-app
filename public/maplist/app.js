@@ -35,7 +35,7 @@
   const ITEM_H = 44;
   const REASONS_BLOCK = ['出禁', '廃業・閉店', 'ターゲット外'];
   const SCREENS = ['search', 'proposal', 'list', 'later'];
-  const NAV = [['search', '検索', 'search'], ['proposal', '提案', 'target'], ['list', '訪問リスト', 'list'], ['later', '後で訪問', 'later']];
+  const NAV = [['search', '検索', 'search'], ['proposal', '提案', 'target'], ['list', '訪問予定', 'list'], ['later', '後で訪問', 'later']];
   const SITE_URL = 'https://kanryohkk-app.pages.dev';
 
   // ---------- 線のアイコン（1.5px・塗りつぶしなし） ----------
@@ -473,7 +473,7 @@
     const inList = inVisit(s.id) || inLater(s.id);
     const banner = s.visited
       ? `<div class="banner">${ic('info')}訪問済みの店です</div>`
-      : inList ? `<div class="banner">${ic('info')}訪問リストに入っています</div>` : '';
+      : inList ? `<div class="banner">${ic('info')}訪問予定に入っています</div>` : '';
     return `<article class="card shop">
       ${banner}
       <div class="shop-head">
@@ -492,7 +492,7 @@
         ${s.insta ? `<a class="pill-btn" href="https://www.instagram.com/${esc(s.insta)}" target="_blank" rel="noopener">${ic('insta')}@${esc(s.insta)}</a>` : ''}
       </div>
       <div class="actions">
-        <button class="btn" data-act="add" data-id="${s.id}" ${inVisit(s.id) ? 'disabled' : ''}>${ic('plus')}${inVisit(s.id) ? '追加済み' : '訪問リストに追加'}</button>
+        <button class="btn" data-act="add" data-id="${s.id}" ${inVisit(s.id) ? 'disabled' : ''}>${ic('plus')}${inVisit(s.id) ? '追加済み' : '訪問予定に追加'}</button>
         <button class="btn" data-act="copy-map" data-id="${s.id}">${ic('copy')}Map URLコピー</button>
         <a class="btn icon" href="${esc(mapUrl(s))}" target="_blank" rel="noopener" aria-label="地図で開く">${ic('map')}</a>
         <button class="btn text" data-act="block" data-id="${s.id}">${ic('block')}訪問NG</button>
@@ -511,7 +511,7 @@
     const actions = kind === 'visit'
       ? `${common}<button class="btn" data-act="later-move" data-id="${s.id}">後で訪問</button>
          <button class="btn danger" data-act="remove" data-src="visit" data-id="${s.id}">${ic('x')}外す</button>`
-      : `<button class="btn" data-act="back-visit" data-id="${s.id}">${ic('back')}訪問リストに戻す</button>
+      : `<button class="btn" data-act="back-visit" data-id="${s.id}">${ic('back')}訪問予定に戻す</button>
          <button class="btn" data-act="go-dc">${ic('ext')}完了報告へ</button>
          ${common}
          <button class="btn danger" data-act="remove" data-src="later" data-id="${s.id}">${ic('x')}外す</button>`;
@@ -536,7 +536,7 @@
     const items = state.visit;
     $('#lCount').textContent = `${items.length}件`;
     if (!items.length) {
-      $('#lList').innerHTML = `<div class="empty"><p>訪問リストは空です。</p><p class="hint">提案リストから店を追加できます。</p></div>`;
+      $('#lList').innerHTML = `<div class="empty"><p>訪問予定は空です。</p><p class="hint">提案リストから店を追加できます。</p></div>`;
       return;
     }
     const groups = new Map();
@@ -557,7 +557,7 @@
     $('#gCount').textContent = `${items.length}件`;
     $('#gList').innerHTML = items.length
       ? items.map((it) => visitCard(it, 'later')).join('')
-      : `<div class="empty"><p>後で訪問の店はありません。</p><p class="hint">訪問リストの「後で訪問」から移せます。</p></div>`;
+      : `<div class="empty"><p>後で訪問の店はありません。</p><p class="hint">訪問予定の「後で訪問」から移せます。</p></div>`;
   }
 
   // 下のタブは、完了報告アプリの下のタブ（同じ棒・同じ見た目）を使う。ここでは作らない（app.js の mlTabs）
@@ -768,8 +768,8 @@
     const s = findIn(state.pool, id) || findShop(id);
     if (!s || inVisit(id)) return;
     D.visits.add(stripScores(s), state.date)
-      .then(() => toast('訪問リストに追加しました'))
-      .catch((e) => toast((e && e.message) || '訪問リストに追加できませんでした。もう一度お試しください'));
+      .then(() => toast('訪問予定に追加しました'))
+      .catch((e) => toast((e && e.message) || '訪問予定に追加できませんでした。もう一度お試しください'));
   }
 
   function stripScores(s) {
@@ -786,7 +786,7 @@
       // 同じ訪問のまま、後で訪問の印だけを付け外しする（訪問リストと同じデータ）
       await D.visits.setLater(id, to === 'later');
       syncVisits();
-      toast(to === 'later' ? '後で訪問に移しました' : '訪問リストに戻しました');
+      toast(to === 'later' ? '後で訪問に移しました' : '訪問予定に戻しました');
     } catch (e) {
       toast((e && e.message) || '移せませんでした。もう一度お試しください');
     }
