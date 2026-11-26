@@ -343,7 +343,7 @@
       ${a.mode === 'address'
         ? `<label class="field"><span class="sr">住所・町名</span><input id="addr" type="text" placeholder="例：〇〇区〇〇" value="${esc(a.address)}" autocomplete="off"></label>`
         : `<button class="btn wide" data-act="gps">${ic('gps')}${a.lat == null ? '現在地を取得する' : '現在地を取得済み（取り直す）'}</button>
-           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : '現在地の周りから探します。'}</p>`}`;
+           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : (a.place ? `${esc(a.place)}付近の周りから探します。` : '現在地の周りから探します。')}</p>`}`;
   }
 
   function renderRadius() {
@@ -688,9 +688,17 @@
     navigator.geolocation.getCurrentPosition((p) => {
       state.area.lat = p.coords.latitude;
       state.area.lng = p.coords.longitude;
+      state.area.place = null;
       state.userPos = { lat: p.coords.latitude, lng: p.coords.longitude };
       renderArea();
       toast('現在地を取得しました');
+      // 付近の地名を取って、表示を差し替える。取れなければ「現在地の周りから探します。」のまま
+      const at = state.userPos;
+      D.placeName(at).then((name) => {
+        if (state.userPos !== at) return; // 取り直していたら、古い結果は捨てる
+        state.area.place = name;
+        renderArea();
+      }).catch(() => {});
       if (done) done();
     }, () => toast('現在地を取得できませんでした'), { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
   }
@@ -956,13 +964,9 @@
   function closeMenu() {}
 
   // お気に入り条件（検索画面の、お気に入りの場所へ移動する）
+  // メニューの「お気に入り条件」は、検索の画面を上から開くだけ（勝手に下へスクロールしない）
   function goPresets() {
     go('search');
-    setTimeout(() => {
-      const c = $('#presetCard');
-      // 固定ヘッダー（約58px）の下に、カードの上端を合わせる
-      if (c) window.scrollTo({ top: c.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
-    }, 80);
   }
 
   // 下のタブの出し入れ（ゆっくり隠れる・少し上に動かすと出る）は、完了報告アプリ側（app.js）が両方のモードで行う

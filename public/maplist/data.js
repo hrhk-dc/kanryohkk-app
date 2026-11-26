@@ -161,6 +161,12 @@
       return { lat: j.lat, lng: j.lng, label: j.label, viewport: j.viewport || null };
     },
 
+    // 現在地 → 付近の地名（「○○県○○市○○町」）。取れなければ例外（画面は元の文のまま）
+    async placeName({ lat, lng }) {
+      const j = await api('/api/ml-geocode', { reverse: { lat, lng } });
+      return j.label || null;
+    },
+
     // 訪問NG。ログイン中は Firebase（完了報告アプリと同じ）、未ログインはこの端末の中だけ
     async getBlocks() {
       return listBlocks();
