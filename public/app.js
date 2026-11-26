@@ -1468,9 +1468,10 @@ function renderVisitRows() {
       <div class="dup-alert hidden"></div>
       ${editingVisitId ? demoUrlBoxHtml(vals) : ""}
       <div class="row-summary"></div>
-      <div class="btn-row" style="margin:4px 0"><button class="btn small" type="button" data-relookup="${idx}">${ic("refresh")}マップから読み取り直す（店舗名・県・市・区・業種・営業時間を上書き）</button></div>
+      <div class="btn-row" style="margin:4px 0"><button class="btn small" type="button" data-relookup="${idx}">${ic("refresh")}読み取り直す</button></div>
+      <p class="relookup-hint">店舗名・県・市・区・業種・営業時間を上書き</p>
       <details class="row-more"${editingVisitId || !linkFields.length ? " open" : ""}>
-        <summary>読み取った内容を確認・修正（店舗名・都道府県・市・区・業種・営業時間など）</summary>
+        <summary>読み取った内容を確認・修正</summary>
         ${fieldsHtml(otherFields, vals, isAutoField)}
       </details>
     </div>`).join("") : `<p class="rows-empty">上にGoogleマップのリンクを貼ると、ここに1件ずつカードができます</p>`;

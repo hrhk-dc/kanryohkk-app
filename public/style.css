@@ -1686,6 +1686,9 @@ body:not(.mode-ml) .ml-tab { display: none !important; }
 body.mode-ml #mainNav > .tab:not(.ml-tab) { display: none !important; }
 body.mode-ml #mainNav > .ml-tab { display: flex; }
 
+/* 訪問リストの入力カード：長い文字で横にはみ出さないよう、ボタンは短く、説明は小さなグレーの1行にする（Round 19） */
+.relookup-hint { font-size: 12px; line-height: 1.4; color: var(--muted); text-align: center; margin: 0 0 10px; overflow-wrap: anywhere; }
+
 /* ================================================================
    Round 13（v66）：390px の読みやすさ修正（見た目だけ。データ・機能・権限は変えない）
    1. 報告カードの数値メタ行（資金力・説明・必要性・担当・受付）：項目は切らず、項目の単位で折り返す。
