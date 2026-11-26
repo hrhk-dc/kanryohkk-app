@@ -730,6 +730,8 @@ const explainItemOf = (items) => (items || []).find((i) => (i.id === "explainTim
 const needItemOf = (items) => (items || []).find((i) => /必要性/.test(i.label || "") && i.value);
 // 2行目に入る短さにする（意味は変えない。「詳細を表示」の文はそのまま）。備考の（…）はそのまま残す
 const NEED_SHORT = [["上記に当てはまらない", "その他"], ["以前別の会社に依頼して使用したがやめた", "以前利用・解約"], ["既存のサービスで満足している", "既存で満足"], ["これ以上の集客を求めていない", "集客不要"], ["予算がない", "予算なし"]];
+// 報告カードの受付日時の短い表示（例：2026-11-25T10:30 → 11/25 10:30）。年は一覧では省く。値は変えない
+const shortReceived = (s) => { const m = /^\d{4}-(\d{2})-(\d{2})[T ](\d{2}:\d{2})/.exec(String(s)); return m ? `${Number(m[1])}/${Number(m[2])} ${m[3]}` : String(s).replace("T", " "); };
 const needShort = (v) => { const s = String(v); const hit = NEED_SHORT.find(([long]) => s.startsWith(long)); return hit ? hit[1] + s.slice(hit[0].length) : s; };
 function normalizeFormat(key) {
   if (key === "report") { // 「資力」は「資金力」に名前を変更
@@ -1341,10 +1343,10 @@ function renderList() {
     ].filter(Boolean);
     const numRow = [
       itemVal(r.items, "wealth") && `${ic("wallet")}資金力 ${esc(itemVal(r.items, "wealth"))}/10`,
-      (() => { const e = explainItemOf(r.items); return e && `${ic("timer")}説明時間 ${esc(e.value)}${/^\d+(\.\d+)?$/.test(String(e.value).trim()) ? "分" : ""}`; })(),
+      (() => { const e = explainItemOf(r.items); return e && `${ic("timer")}説明 ${esc(e.value)}${/^\d+(\.\d+)?$/.test(String(e.value).trim()) ? "分" : ""}`; })(),
       (() => { const n = needItemOf(r.items); return n && `${ic("tag")}必要性：${esc(needShort(n.value))}`; })(),
       itemVal(r.items, "personName") && `${ic("user")}${esc(itemVal(r.items, "personName"))}`,
-      firstOfType(r.items, ["datetime"]) && `${ic("clock")}受付 ${esc(firstOfType(r.items, ["datetime"]).replace("T", " "))}`
+      firstOfType(r.items, ["datetime"]) && `${ic("clock")}受付 ${esc(shortReceived(firstOfType(r.items, ["datetime"])))}`
     ].filter(Boolean);
     const shown = ["caseNo", "caseName", "result", "visitTo", "personName", "wealth", "explainTime"];
     const explainItem = explainItemOf(r.items);
@@ -2762,7 +2764,7 @@ function renderStats() {
 
   // 推移：期間の大きさに合わせて 日別／月別／年別
   const spanDays = range.unit === "all" ? 9999 : Math.round((new Date(range.to) - new Date(range.from)) / 864e5) + 1;
-  const bucket = spanDays <= 62 ? [(d) => d, (k) => fmtDateJa(k), "日別"] : spanDays <= 800 ? [monthOf, (k) => k.replace("-", "年") + "月", "月別"] : [(d) => d.slice(0, 4), (k) => k + "年", "年別"];
+  const bucket = spanDays <= 62 ? [(d) => d, (k) => slashDate(k), "日別"] : spanDays <= 800 ? [monthOf, (k) => k.replace("-", "年") + "月", "月別"] : [(d) => d.slice(0, 4), (k) => k + "年", "年別"];
   $("#statsTrendTitle").textContent = `${bucket[2]}の推移`;
   const tr = {};
   const T = (k) => (tr[k] ||= { key: k, visits: 0, reports: 0, won: 0 });
