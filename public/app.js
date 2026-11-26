@@ -411,6 +411,7 @@ const drafts = {};
 let adminSection = "report";
 let reports = [];
 let visits = [];
+let mlAllVisits = []; // 後で訪問（ml_later）も含む、全部の訪問。完了報告の画面の visits からは後で訪問を外す
 let editingId = null;
 let editingVisitId = null;
 let visitRows = [];
@@ -611,6 +612,7 @@ function stopData() { unsubs.forEach((u) => u()); unsubs = []; dataLoaded = fals
 
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
+  window.dispatchEvent(new Event("dc-auth-changed"));
   stopData();
   if (membersUnsub) { membersUnsub(); membersUnsub = null; }
   membersLoaded = false;
@@ -624,6 +626,8 @@ onAuthStateChanged(auth, (user) => {
     $("#logoutBtn").classList.add("hidden");
     $("#userEmail").textContent = "";
     setMenu(false);
+    document.body.classList.remove("member");
+    if (curApp === "ml") window.dcSwitchApp("dc"); // ログアウトしたら、完了報告の画面に戻す
     return;
   }
 
@@ -647,6 +651,8 @@ function applyAccess() {
   const ok = isMember();
   $("#appView").classList.toggle("hidden", !ok);
   $("#pendingView").classList.toggle("hidden", ok);
+  document.body.classList.toggle("member", ok); // アプリの切り替えは、メンバーにだけ出す
+  if (!ok && curApp === "ml") window.dcSwitchApp("dc");
   $("#userEmail").textContent = currentUser.email + (isAdmin() ? "（管理者）" : "");
   $("#adminTab").classList.toggle("hidden", !isAdmin());
   $("#statsTab").classList.toggle("hidden", !isAdmin());
@@ -686,11 +692,14 @@ function subscribe() {
   }, (err) => showBanner(err, "報告一覧の読み込み")));
 
   unsubs.push(onSnapshot(query(collection(db, "visits"), orderBy("createdAt", "desc")), (snap) => {
-    visits = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    mlAllVisits = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    visits = mlAllVisits.filter((v) => !isLaterVisit(v)); // 後で訪問（ml_later）は完了報告の画面に出さない
+    migrateLaterFromLocal();
     applyDemoUrls();
     renderList();
     renderVisitList();
     renderAllExtras();
+    window.dispatchEvent(new Event("dc-visits-changed")); // マップリストの画面も、同じ訪問リストを読み直す
   }, (err) => showBanner(err, "訪問リストの読み込み")));
 
   if (isAdmin()) {
@@ -1994,7 +2003,8 @@ function renderVisitList() {
       html += `<div class="group-title">${fmtDateJa(v.visitDate)}　${count}件</div>`;
       lastDate = v.visitDate;
     }
-    const items = v.items || [];
+    // ml_ で始まる項目は、マップリストの内部用（画面には出さない）
+    const items = (v.items || []).filter((i) => !String(i.id || "").startsWith("ml_"));
     let titleIdx = items.findIndex((i) => i.id === "shopName" && i.value);
     if (titleIdx < 0) titleIdx = items.findIndex((i) => i.value && i.type === "text");
     const title = titleIdx >= 0 ? items[titleIdx].value : "（店舗名なし）";
@@ -2960,4 +2970,228 @@ function pullEnd() {
 }
 document.addEventListener("touchend", pullEnd, { passive: true });
 document.addEventListener("touchcancel", () => { pull.active = false; pullHide(); }, { passive: true });
+
+/* ---------- アプリの切り替え：完了報告 ⇄ マップリスト ----------
+   同じ画面・同じログイン・同じ Firestore（visits・vla_blocks）を使う。
+   マップリストの画面は、この画面の中の影の根（shadow root）に入る（CSS と ID が混ざらない） */
+let curApp = "dc";
+const APP_NAMES = { dc: "DC 完了報告", ml: "マップリスト" };
+let mlMounted = false;
+
+function setAppTitle(mode) {
+  const name = document.getElementById("appName");
+  if (name) name.textContent = APP_NAMES[mode];
+  document.getElementById("appLogo")?.classList.toggle("hidden", mode === "ml");
+  document.getElementById("appLogoMl")?.classList.toggle("hidden", mode !== "ml");
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("マップリストを読み込めませんでした。時間をおいてもう一度お試しください"));
+    document.body.appendChild(s);
+  });
+}
+
+// マップリストの画面を、初めて開くときだけ組み込む（以後は同じ画面を出し入れするだけ。入力中の内容も残る）
+async function mountMaplist() {
+  if (mlMounted) return;
+  const host = document.getElementById("mlHost");
+  const sr = host.shadowRoot || host.attachShadow({ mode: "open" });
+  const css = await (await fetch("/maplist/style.css")).text();
+  const style = document.createElement("style");
+  // マップリストの CSS は、この中（:host）だけに効かせる。body は完了報告アプリ側の画面なので :host に読み替える
+  style.textContent = css.replace(/body\.lock/g, ":host(.lock)").replace(/:root\b/g, ":host").replace(/\bbody\b/g, ":host");
+  sr.appendChild(style);
+  sr.appendChild(document.getElementById("mlTpl").content.cloneNode(true));
+  window.__mlRoot = sr;
+  await loadScriptOnce("/maplist/data.js");
+  await loadScriptOnce("/maplist/app.js");
+  mlMounted = true;
+}
+
+window.dcSwitchApp = async function (mode) {
+  if (mode === curApp) return;
+  if (mode === "ml" && !document.body.classList.contains("member")) return; // メンバーだけ
+  if (mode === "ml") {
+    try { await mountMaplist(); } catch (e) { toast(e.message || "切り替えられませんでした"); return; }
+  }
+  curApp = mode;
+  document.body.classList.toggle("mode-ml", mode === "ml");
+  document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
+    const on = b.dataset.app === mode;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  setAppTitle(mode);
+  setMenu(false);
+  window.scrollTo(0, 0); // 画面は再読み込みしない（同じページの中で切り替える）
+};
+document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
+  b.addEventListener("click", () => window.dcSwitchApp(b.dataset.app));
+});
+// 三本線メニューの「訪問NG一覧」「お気に入り条件」（マップリストの機能）
+document.querySelectorAll("[data-ml-act]").forEach((b) => {
+  b.addEventListener("click", () => {
+    setMenu(false);
+    if (!window.mlActions) return;
+    if (b.dataset.mlAct === "block") window.mlActions.blockList();
+    else window.mlActions.presets();
+  });
+});
+
+/* ---------- マップリスト → 訪問リスト（完了報告の visits）の窓口 ----------
+   マップリストの画面（public/maplist/app.js）から呼ばれる。訪問リストは別のデータを持たず、この visits をそのまま使う。
+   マップリスト用の項目は ml_ で始まる（完了報告の画面では出さない）。 */
+const JP_DAY = { "日": "sun", "月": "mon", "火": "tue", "水": "wed", "木": "thu", "金": "fri", "土": "sat" };
+const DAY_LABEL = { mon: "月", tue: "火", wed: "水", thu: "木", fri: "金", sat: "土", sun: "日" };
+const WEEK_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+// 営業時間の文字（「月：11:30〜14:00」の行）を、曜日ごとの形にする。曜日の無い文字は全部の曜日に出す
+function hoursFromText(txt) {
+  const hours = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null };
+  const text = String(txt || "").trim();
+  let any = false;
+  for (const line of text.split("\n")) {
+    const m = line.match(/^(日|月|火|水|木|金|土)[^：:]*[：:]\s*(.*)$/);
+    if (m) { hours[JP_DAY[m[1]]] = m[2].trim() || null; any = true; }
+  }
+  if (!any) for (const k of Object.keys(hours)) hours[k] = text || "時間不明";
+  return hours;
+}
+
+// 店の営業時間（曜日ごと）を、完了報告の「営業時間」の文字にする
+function hoursText(h) {
+  return WEEK_ORDER.map((k) => `${DAY_LABEL[k]}：${h && h[k] ? h[k] : "定休日"}`).join("\n");
+}
+
+// 完了報告の訪問 → マップリストの店（ml_shop があればそのまま。手で入れた訪問は、項目から作る）
+function shopFromVisit(v) {
+  const it = (id) => (v.items || []).find((i) => i.id === id);
+  const ml = it("ml_shop");
+  if (ml && ml.value) { try { return JSON.parse(ml.value); } catch (e) { /* 壊れていたら下で作り直す */ } }
+  const rating = Number(it("rating")?.value);
+  return {
+    id: it("ml_placeId")?.value || v.id,
+    name: it("shopName")?.value || "（店舗名なし）",
+    industry: it("category")?.value || "",
+    address: it("address")?.value || "",
+    lat: null, lng: null,
+    rating: Number.isFinite(rating) ? rating : 0,
+    reviews: 0, opened: null, staff: null, insta: "",
+    hours: hoursFromText(it("hours")?.value || ""),
+    visited: false,
+  };
+}
+
+// 店 → 完了報告の訪問の項目（マップリストの店を、訪問リストに入れるときの中身）
+function buildShopItems(s) {
+  return [
+    { id: "shopName", label: "店舗名", type: "text", value: s.name || "" },
+    { id: "mapsUrl", label: "GoogleマップのURL", type: "maps", value: `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(s.id)}` },
+    { id: "category", label: "業種", type: "select", value: s.industry || "" },
+    { id: "address", label: "住所", type: "text", value: s.address || "" },
+    { id: "hours", label: "営業時間", type: "textarea", value: hoursText(s.hours) },
+    { id: "rating", label: "Googleの評価", type: "text", value: s.rating ? String(s.rating) : "" },
+    { id: "ml_placeId", label: "マップリストID", type: "text", value: String(s.id) },
+    { id: "ml_shop", label: "マップリストの店情報", type: "text", value: JSON.stringify(s) },
+  ];
+}
+
+// 後で訪問：visits の項目に ml_later の印を付ける（完了報告の画面では出さない）
+const isLaterVisit = (v) => (v.items || []).some((i) => i.id === "ml_later");
+const LATER_ITEM = { id: "ml_later", label: "後で訪問", type: "text", value: "1" };
+const LATER_LOCAL = "vla:later"; // 以前の端末内の「後で訪問」（一度だけ visits に移す）
+
+// 店の id（Googleの場所ID）か、訪問の id から、完了報告の訪問を探す（後で訪問も含む全部から）
+const bridgeDoc = (id) => mlAllVisits.find((v) => v.id === id || (v.items || []).some((i) => i.id === "ml_placeId" && i.value === id));
+const visitItem = (v) => { const shop = shopFromVisit(v); return { id: shop.id, shop, visitDate: v.visitDate || "" }; };
+
+// 店を visits に作る。書類の番号は場所IDから決めて、同じ店が二重に入らないようにする（別の端末から入れても）
+async function createVisitFromShop(shop, visitDate, later) {
+  const ref = doc(db, "visits", "ml_" + encodeURIComponent(String(shop.id)));
+  const counterRef = doc(db, "counters", "caseNo");
+  return runTransaction(db, async (tx) => {
+    const exists = await tx.get(ref);
+    if (exists.exists()) return false;
+    const snap = await tx.get(counterRef);
+    const last = snap.exists() ? (snap.data().last || 0) : 0;
+    const items = buildShopItems(shop);
+    if (later) items.push({ ...LATER_ITEM });
+    tx.set(counterRef, { last: last + 1, updatedAt: serverTimestamp() });
+    tx.set(ref, {
+      caseNo: fmtCaseNo(last + 1), visitDate: visitDate || "", items, order: 0,
+      authorUid: currentUser.uid,
+      authorEmail: currentUser.email,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  });
+}
+
+// 以前の端末内の「後で訪問」を、一度だけ visits に移す（移せたら端末内の分は消す）
+let laterMigrated = false;
+async function migrateLaterFromLocal() {
+  if (laterMigrated || !currentUser) return;
+  let list = null;
+  try { list = JSON.parse(localStorage.getItem(LATER_LOCAL) || "null"); } catch (e) { list = null; }
+  if (!Array.isArray(list)) { laterMigrated = true; return; }
+  try {
+    for (const it of list) {
+      if (it && it.shop && it.shop.id) await createVisitFromShop(it.shop, it.visitDate || "", true);
+    }
+    localStorage.removeItem(LATER_LOCAL);
+    laterMigrated = true;
+  } catch (e) { console.warn("後で訪問の移行をもう一度行います", e); }
+}
+
+window.dcVisitBridge = {
+  // 訪問リストの一覧（完了報告の visits と同じ。手で入れた訪問も含む。後で訪問は入らない）
+  list() {
+    return visits.map(visitItem);
+  },
+
+  // 後で訪問の一覧（visits のうち ml_later の印が付いたもの）
+  laterList() {
+    return mlAllVisits.filter(isLaterVisit).map(visitItem);
+  },
+
+  // 店を訪問リストに入れる（案件番号は完了報告と同じ共通の連番）
+  async add(shop, visitDate) {
+    if (!currentUser) throw new Error("訪問リストに入れるには、ログインしてください");
+    if (bridgeDoc(shop.id)) return; // 入っている店は重ねて入れない
+    await createVisitFromShop(shop, visitDate, false);
+  },
+
+  // 後で訪問に移す（on=true）／訪問リストに戻す（on=false）。訪問日はそのまま残す
+  async setLater(id, on) {
+    const v = bridgeDoc(id);
+    if (!v) throw new Error("この訪問が見つかりません。画面を読み直してください");
+    if (isLaterVisit(v) === !!on) return;
+    const base = (v.items || []).filter((i) => i.id !== "ml_later");
+    const items = on ? [...base, { ...LATER_ITEM }] : base;
+    await updateDoc(doc(db, "visits", v.id), { items, updatedAt: serverTimestamp(), updatedBy: currentUser.email });
+    historyUpdate("visits", v, ["items"], { items }, on ? "後で訪問に移す（マップリスト）" : "訪問リストに戻す（マップリスト）");
+  },
+
+  // 訪問日を変える（空にすると「日付未定」）
+  async setDate(id, visitDate) {
+    const v = bridgeDoc(id);
+    if (!v) throw new Error("この訪問が見つかりません。画面を読み直してください");
+    const next = visitDate || "";
+    await updateDoc(doc(db, "visits", v.id), { visitDate: next, updatedAt: serverTimestamp(), updatedBy: currentUser.email });
+    historyUpdate("visits", v, ["visitDate"], { visitDate: next }, "訪問日の変更（マップリスト）");
+  },
+
+  // 訪問リストから外す（「戻る」で元に戻せる）
+  async remove(id) {
+    const v = bridgeDoc(id);
+    if (!v) return;
+    await deleteDoc(doc(db, "visits", v.id));
+    historyDelete("visits", v, "訪問先の削除（マップリスト）");
+  },
+};
 
