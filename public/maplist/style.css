@@ -215,6 +215,7 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* 下のドック（固定ボタン）・下のタブ */
 .dock {
+  transform: translateY(var(--dock-drop, 0px)); transition: transform .45s ease-out; /* 下のタブが隠れたら、ボタンも下へずれる（完了報告側が --dock-drop を決める） */
   position: fixed; left: 0; right: 0; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 5;
   display: flex; gap: 10px; padding: 16px 16px 10px;
   background: linear-gradient(rgba(11, 13, 18, 0), rgba(11, 13, 18, .94) 35%);

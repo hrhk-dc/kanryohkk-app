@@ -560,9 +560,8 @@
       : `<div class="empty"><p>後で訪問の店はありません。</p><p class="hint">訪問リストの「後で訪問」から移せます。</p></div>`;
   }
 
-  function renderNav() {
-    $('#nav').innerHTML = NAV.map(([k, l, i]) => `<a href="#" data-nav="${k}">${ic(i)}<span>${l}</span><em class="bdg" data-badge="${k}"></em></a>`).join('');
-  }
+  // 下のタブは、完了報告アプリの下のタブ（同じ棒・同じ見た目）を使う。ここでは作らない（app.js の mlTabs）
+  function renderNav() {}
   function renderBadges() {
     const n = { list: state.visit.length, later: state.later.length };
     $$('[data-badge]').forEach((el) => { const c = n[el.dataset.badge]; el.textContent = c ? String(c) : ''; });
@@ -634,9 +633,10 @@
   function showScreen() {
     const name = currentName();
     $$('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
-    $$('#nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === name));
     renderAll();
     window.scrollTo(0, 0);
+    // 下のタブ（完了報告アプリの棒）の選ばれている印を合わせる
+    window.dispatchEvent(new CustomEvent('ml-screen', { detail: name }));
   }
   function go(name) {
     curScreen = name;
@@ -965,23 +965,7 @@
     }, 80);
   }
 
-  // ---------- 下のタブ：下にスクロールするとゆっくり隠れ、上にスクロールするとゆっくり出る ----------
-  let tabsLastY = window.scrollY;
-  let tabsRaf = 0;
-  function updateTabsVisibility() {
-    tabsRaf = 0;
-    const tabs = $('#nav');
-    if (!tabs) return;
-    const y = Math.max(0, window.scrollY);
-    const dy = y - tabsLastY;
-    if (y < 8) tabs.classList.remove('hide');       // 一番上では必ず出す
-    else if (dy > 6) tabs.classList.add('hide');    // 下へスクロール：隠す
-    else if (dy < -6) tabs.classList.remove('hide'); // 上へスクロール：出す
-    if (Math.abs(dy) > 6) tabsLastY = y;
-  }
-  window.addEventListener('scroll', () => {
-    if (!tabsRaf) tabsRaf = requestAnimationFrame(updateTabsVisibility);
-  }, { passive: true });
+  // 下のタブの出し入れ（ゆっくり隠れる・少し上に動かすと出る）は、完了報告アプリ側（app.js）が両方のモードで行う
 
   // ---------- 操作の登録（クリックの委任） ----------
   const ACT = {
@@ -1099,6 +1083,7 @@
     window.mlActions = {
       blockList: () => openBlockList(),
       presets: () => goPresets(),
+      go: (name) => go(name), // 下のタブ（完了報告アプリの棒）から画面を切り替える
     };
     await refreshUser(); // 画面は先に出し、ログイン状態は後から反映する
   }
