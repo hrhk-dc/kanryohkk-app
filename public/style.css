@@ -1609,6 +1609,29 @@ a.menu-item { text-decoration: none; }
 .st-rate-box small { white-space: normal; }
 
 /* ================================================================
+   Round 15（v69）：訪問リストの見出しの右に「Maplist」ボタン（マップリストアプリへ、新しいタブ）
+   1. 見出し（左）とボタン（右）を同じ行に並べる（.card-head）。390pxでも1行に収まる。
+   2. ボタンは押せるので黒＋細い虹色の縁（DESIGN.md の押せるボタンの決まり）。高さ44px以上・完全なピル形。
+      文字は白・太字、絵文字・記号文字は使わない。左に線ではなく、マップリストアプリのアイコン（26px）。
+   3. このカードだけに置く（ほかのタブ・カードには付けない）。
+   ================================================================ */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.card-head h2 { margin: 0; }
+.maplist-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 16px 0 8px; margin: 0;
+  border: 1.5px solid transparent; border-radius: 999px;
+  background: linear-gradient(rgba(11, 13, 18, .86), rgba(11, 13, 18, .86)) padding-box, var(--k-ring) border-box;
+  box-shadow: var(--k-lift);
+  color: var(--text); font: inherit; font-size: 15px; font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease), box-shadow .15s;
+}
+.maplist-btn:active { transform: translateY(2px) scale(.97); box-shadow: var(--k-press); }
+.maplist-ic { width: 26px; height: 26px; border-radius: 7px; flex: none; display: block; }
+@media (prefers-reduced-motion: reduce) { .maplist-btn { transition: none !important; } }
+
+/* ================================================================
    Round 13（v66）：390px の読みやすさ修正（見た目だけ。データ・機能・権限は変えない）
    1. 報告カードの数値メタ行（資金力・説明・必要性・担当・受付）：項目は切らず、項目の単位で折り返す。
       1項目＝1つのグレーのピル（縮めない・隠さない）。Round 7 の「2行にしない」は、5項目が
