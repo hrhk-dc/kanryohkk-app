@@ -1,7 +1,7 @@
 // 住所・町名 → 座標（Cloudflare Pages Functions：POST /api/geocode）
 // ログイン不要。1つのIPからの連続した大量リクエストは回数制限で止める（1分に30回まで）。
 // 町名の範囲（viewport）も返す。
-import { keyOf, geocodeText, reverseText, placesHint } from "../../lib/vla-core.js";
+import { keyOf, geocodeText, reverseText, placesErrorText } from "../../lib/vla-core.js";
 import { hitLimit, clientIp, tooMany } from "../../lib/rate-limit.js";
 
 const json = (body, status = 200) =>
@@ -26,7 +26,7 @@ export async function onRequestPost({ request, env }) {
       if (!label) return json({ ok: false, error: "付近の地名が見つかりませんでした" }, 404);
       return json({ ok: true, label });
     } catch (e) {
-      return json({ ok: false, error: placesHint(e.reason) || "付近の地名を取得できませんでした" }, 502);
+      return json({ ok: false, error: placesErrorText(e, key, "付近の地名を取得できませんでした") }, 502);
     }
   }
 
@@ -39,6 +39,6 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true, ...hit });
   } catch (e) {
     // 原因（キー・API未有効化・請求先など）が分かるように、理由を日本語のヒントで返す
-    return json({ ok: false, error: placesHint(e.reason) || "場所の検索に失敗しました。時間をおいてもう一度お試しください" }, 502);
+    return json({ ok: false, error: placesErrorText(e, key, "場所の検索に失敗しました。時間をおいてもう一度お試しください") }, 502);
   }
 }
