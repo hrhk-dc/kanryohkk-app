@@ -168,7 +168,7 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
     });
     ok('切り替え：マップリストの画面になる（タイトル・切り替えの選択）', ml.mode && ml.title === 'マップリスト' && ml.selected === 'true', JSON.stringify({ title: ml.title, selected: ml.selected }));
     ok('切り替え：完了報告の画面は隠れ、マップリストの画面が出る', ml.dcHidden && ml.hostVisible && ml.hasShadow, JSON.stringify({ dcHidden: ml.dcHidden, hostVisible: ml.hostVisible }));
-    ok('マップリスト：下のタブ（検索・提案・訪問リスト・後で訪問）', ml.navItems.join('/') === '検索/提案リスト/訪問リスト/後で訪問', ml.navItems.join('/'));
+    ok('マップリスト：下のタブ（検索・提案・訪問予定・後で訪問）', ml.navItems.join('/') === '検索/提案リスト/訪問予定/後で訪問', ml.navItems.join('/'));
     ok('マップリスト：最初は検索の画面', ml.activeScreen === 'search', ml.activeScreen);
     ok('390px：マップリストで横スクロールなし', !ml.hScroll);
     await page.screenshot({ path: `${SHOTS}/integ-ml-search.png` });

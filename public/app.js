@@ -3145,6 +3145,8 @@ function buildShopItems(s) {
 
 // 後で訪問：visits の項目に ml_later の印を付ける（完了報告の画面では出さない）
 const isLaterVisit = (v) => (v.items || []).some((i) => i.id === "ml_later");
+// マップリストから入れた訪問か（店の場所IDの印 ml_placeId は、マップリストから入れるときだけ付く。手で入れた訪問には付かない）
+const isMlVisit = (v) => (v.items || []).some((i) => i.id === "ml_placeId");
 const LATER_ITEM = { id: "ml_later", label: "後で訪問", type: "text", value: "1" };
 const LATER_LOCAL = "vla:later"; // 以前の端末内の「後で訪問」（一度だけ visits に移す）
 
@@ -3192,9 +3194,9 @@ async function migrateLaterFromLocal() {
 }
 
 window.dcVisitBridge = {
-  // 訪問リストの一覧（完了報告の visits と同じ。手で入れた訪問も含む。後で訪問は入らない）
+  // 訪問予定の一覧（マップリストから入れた訪問だけ。後で訪問は入らない。完了報告の画面の予定には、手で入れた訪問も出る）
   list() {
-    return visits.map(visitItem);
+    return visits.filter(isMlVisit).map(visitItem);
   },
 
   // 後で訪問の一覧（visits のうち ml_later の印が付いたもの）
