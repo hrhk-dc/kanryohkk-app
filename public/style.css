@@ -1700,6 +1700,8 @@ body.mode-ml .ml-only { display: flex; }
 .hist-btn:active { transform: scale(.96); }
 .hist-btn:disabled { opacity: .35; cursor: default; }
 .hist-btn:disabled:hover { background: var(--tile); }
+/* 「このアプリについて」は完了報告の項目。マップリストのメニューには出さない */
+body.mode-ml .dc-only-menu { display: none !important; }
 
 /* 下のタブ：完了報告の棒を、マップリストでも使う（同じ見た目・同じ動き）。モードで中身だけ替える */
 body:not(.mode-ml) .ml-tab { display: none !important; }

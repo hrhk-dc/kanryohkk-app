@@ -49,19 +49,25 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       return {
         items,
         email,
-        tabsLeft: document.querySelectorAll('#menuPanel [data-menu-tab]').length,
+        tabsLeft: document.querySelectorAll('#menuPanel [data-menu-tab]:not([data-menu-tab="about"])').length,
         undoInMenu: !!document.querySelector('#menuPanel #undoBtn, #menuPanel #redoBtn'),
         maplistLink: !!document.querySelector('#menuPanel a[href*="maplist-app"]'),
         mlItemsVisible: [...document.querySelectorAll('#menuMl .menu-item')].filter(visible).length,
       };
     });
-    const want = ['リンクをコピー', '名前を設定', 'ログアウト'];
-    ok('三本線メニュー：残るのは リンクをコピー・名前を設定・ログアウト だけ', want.every((w) => menu.items.includes(w)) && menu.items.length === want.length, JSON.stringify(menu.items));
+    const want = ['このアプリについて', 'リンクをコピー', '名前を設定', 'ログアウト'];
+    ok('三本線メニュー：残るのは このアプリについて・リンクをコピー・名前を設定・ログアウト だけ', want.every((w) => menu.items.includes(w)) && menu.items.length === want.length, JSON.stringify(menu.items));
     ok('三本線メニュー：メールアドレスの表示が残る', menu.email.length > 0, menu.email);
     ok('三本線メニュー：下のタブと同じ項目（予定・訪問リスト・完了報告・報告一覧・集計・管理・このアプリについて）はない', menu.tabsLeft === 0, String(menu.tabsLeft));
     ok('三本線メニュー：元に戻す・やり直すは入っていない', !menu.undoInMenu, '');
     ok('三本線メニュー：マップリストアプリへのリンクは入っていない', !menu.maplistLink, '');
     await page.screenshot({ path: `${SHOTS}/r21-menu.png` });
+    // 「このアプリについて」は残っていて、押すと説明の画面が出る
+    await page.click('#menuPanel [data-menu-tab="about"]'); await wait(page, 500);
+    const aboutShown = await page.evaluate(() => !document.getElementById('tab-about').classList.contains('hidden'));
+    ok('三本線メニュー：「このアプリについて」を押すと説明の画面が出る', aboutShown, '');
+    await page.click('#mainNav [data-tab="today"]'); await wait(page, 400);
+    await page.click('#menuBtn'); await wait(page, 300);
     await page.keyboard.press('Escape'); await wait(page, 300);
 
     // 2) 元に戻す・やり直す：タイトルの下に、横一列・折り返さない
@@ -143,7 +149,8 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       document.getElementById('menuBtn').click();
       await new Promise((r) => setTimeout(r, 300));
       const labels = [...document.querySelectorAll('#menuMl .menu-item')].map((e) => e.textContent.trim());
-      return labels.includes('訪問NG一覧') && labels.includes('お気に入り条件');
+      const aboutHidden = getComputedStyle(document.querySelector('#menuPanel [data-menu-tab="about"]')).display === 'none';
+      return labels.includes('訪問NG一覧') && labels.includes('お気に入り条件') && aboutHidden;
     }));
     await page.keyboard.press('Escape'); await wait(page, 300);
 
