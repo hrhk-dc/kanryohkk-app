@@ -186,6 +186,46 @@
   let pendingCount = 5;
   let dateCb = null;
 
+  // ---------- 再読み込みしても消えないように（端末内。検索条件・提案の候補・表示の状態） ----------
+  // 訪問予定・後で訪問は完了報告の visits（Firestore）から読むので、ここには入れない。
+  // 候補（提案）は、同じ日（JST）のものだけ戻す。前の日の候補は消して、もう一度検索してもらう。
+  const UI_KEY = 'ui';
+  let uiSaveTimer = null;
+  function saveUi() {
+    LS.set(UI_KEY, {
+      day: today, at: Date.now(),
+      area: state.area, radius: state.radius, count: state.count, date: state.date,
+      industries: [...state.industries], indTab: state.indTab,
+      pool: state.pool, snap: state.snap,
+      pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries],
+      openOnly: state.openOnly, expanded: [...state.expanded], listSort: state.listSort,
+      screen: curScreen,
+    });
+  }
+  function saveUiSoon() { clearTimeout(uiSaveTimer); uiSaveTimer = setTimeout(saveUi, 300); }
+  // 戻せたら true。前の日の候補があって消したときは 'stale' を返す
+  function restoreUi() {
+    const d = LS.get(UI_KEY, null);
+    if (!d || typeof d !== 'object') return null;
+    const sameDay = d.day === today;
+    const arr = (v) => (Array.isArray(v) ? v : []);
+    if (d.area && typeof d.area === 'object') state.area = { ...state.area, ...d.area };
+    if (RADIUS.some((r) => r[0] === d.radius)) state.radius = d.radius;
+    if (Number.isFinite(d.count)) state.count = d.count;
+    state.date = sameDay && d.date ? d.date : addDays(today, 1);
+    state.industries = new Set(arr(d.industries));
+    if (Number.isFinite(d.indTab)) state.indTab = d.indTab;
+    if (Object.prototype.hasOwnProperty.call(SORTERS, d.pSort)) state.pSort = d.pSort;
+    if (d.pView === 'map' || d.pView === 'list') state.pView = d.pView;
+    state.pIndustries = new Set(arr(d.pIndustries));
+    if (typeof d.openOnly === 'boolean') state.openOnly = d.openOnly;
+    state.expanded = new Set(arr(d.expanded));
+    if (typeof d.listSort === 'string') state.listSort = d.listSort;
+    if (SCREENS.includes(d.screen)) curScreen = d.screen;
+    if (sameDay && arr(d.pool).length) { state.pool = d.pool; state.snap = d.snap || null; return 'restored'; }
+    return arr(d.pool).length ? 'stale' : 'restored';
+  }
+
   // ---------- 共通の部品 ----------
   const weekRange = (k) => { const d = addDays(today, k); return d; };
   const mapUrl = (s) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + s.address)}`;
@@ -674,6 +714,7 @@
       state.openOnly = true;
       state.expanded = new Set();
       go('proposal');
+      saveUiSoon();
     } catch (e) {
       toast(e && e.message ? e.message : '取得に失敗しました。時間をおいてもう一度お試しください');
     } finally {
@@ -1077,9 +1118,13 @@
     renderNav();
     const note = $('#demoNote');
     if (note) note.hidden = !D.isSample;
+    const restored = restoreUi();
     syncVisits();
     renderAll();
     showScreen();
+    // 操作のたびに、条件・候補・表示の状態を端末に保存する（再読み込みしても戻る）
+    ['input', 'change', 'click'].forEach((ev) => root.addEventListener(ev, saveUiSoon));
+    if (restored === 'stale') toast('前の日の提案は消しました。もう一度検索してください');
     D.onVisitsChange(visitsChanged);
     D.onAuthChange(() => refreshUser());
     // 完了報告アプリの三本線メニューから呼ぶ（訪問NG一覧・お気に入り条件）
