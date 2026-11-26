@@ -1580,3 +1580,28 @@ body.menu-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .menu-layer, .menu-panel, .menu-item, .menu-btn { transition: none !important; }
 }
+
+/* ================================================================
+   Round 14（v67）
+   1. 「このアプリについて」（.about）：短い文・見出し付き。390pxで読みやすい行間と字の大きさ（本文16px）。
+      押せるボタンは置かない（表示だけのページ）。
+   2. 成約率の表示（.st-rate）：「75%」の下に「成約3 ／ 報告4」を小さく出し、分母を見せる。
+   3. 成約率の注記（.rate-note）は補助の文字（13px・--muted）。
+   ================================================================ */
+.about { line-height: 1.75; }
+.about h2 { margin-bottom: 6px; }
+.about h3 { font-size: 16px; font-weight: 700; margin: 22px 0 8px; color: var(--text); }
+.about-lead { font-size: 16px; color: var(--sub); margin: 4px 0 0; }
+.about ul, .about ol { margin: 0; padding-left: 1.3em; color: var(--sub); }
+.about li { margin: 0 0 8px; }
+.about li b { color: var(--text); }
+.about-list { margin: 0; }
+.about-list dt { font-weight: 700; color: var(--text); margin-top: 12px; }
+.about-list dt:first-child { margin-top: 0; }
+.about-list dd { margin: 2px 0 0; color: var(--sub); }
+.about .hint { margin-top: 18px; font-size: 13px; color: var(--muted); }
+.rate-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.st-rate { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+.st-rate b { font-weight: 700; }
+.st-rate small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.st-rate-box small { white-space: normal; }

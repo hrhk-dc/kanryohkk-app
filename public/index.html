@@ -40,6 +40,7 @@
       <button class="menu-item" type="button" data-menu-tab="list"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><circle cx="4" cy="6.5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="17.5" r="1"/></svg><span>報告一覧</span></button>
       <button id="menuStatsTab" class="menu-item hidden" type="button" data-menu-tab="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span>集計</span></button>
       <button id="menuAdminTab" class="menu-item hidden" type="button" data-menu-tab="admin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg><span>管理</span></button>
+      <button class="menu-item" type="button" data-menu-tab="about"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.01"/></svg><span>このアプリについて</span></button>
     </div>
     <div class="menu-sep" role="separator"></div>
     <div class="menu-group">
@@ -167,10 +168,6 @@
         <div id="todayVisits"></div>
       </div>
       <div class="card">
-        <h2>次回アクション（今日まで）</h2>
-        <div id="todayActions"></div>
-      </div>
-      <div class="card">
         <h2>報告がまだの訪問</h2>
         <div id="todayMissing"></div>
       </div>
@@ -185,7 +182,6 @@
             <select id="sortSelect">
               <option value="new">報告が新しい順</option>
               <option value="old">報告が古い順</option>
-              <option value="nextDate">次回予定日が近い順</option>
               <option value="received">受付日時が新しい順</option>
               <option value="caseName">店舗名順（あいうえお）</option>
             </select>
@@ -273,9 +269,7 @@
           </label>
           <div class="btn-row">
             <button class="btn small" type="button" id="visitShowTomorrow">明日</button>
-            <button class="btn small" type="button" id="visitShowAll">すべての日付</button>
-            <button class="btn small" type="button" id="copyAllClaude">表示中のマップを全件Claude Code用にコピー</button>
-          </div>
+            <button class="btn small" type="button" id="visitShowAll">すべての日付</button>          </div>
         </div>
         <div id="personCounts" class="person-counts"></div>
         <div id="visitList"></div>
@@ -317,6 +311,7 @@
         </div>
         <p class="hint" id="dailyRange"></p>
         <div id="statsDaily"></div>
+        <p class="hint rate-note">成約率＝成約 ÷ 報告（報告が0件、または訪問が0件のときは「—」）</p>
         <div class="btn-row"><button class="btn small primary" type="button" id="copyDaily">日報をコピー（LINE・メール用）</button></div>
         <h3 class="stats-h">担当者別</h3>
         <div id="statsPerson"></div>
@@ -324,6 +319,7 @@
         <div id="statsArea"></div>
         <h3 class="stats-h" id="statsTrendTitle">推移</h3>
         <div id="statsMonth"></div>
+        <p class="hint rate-note">成約率＝成約 ÷ 報告（報告が0件、または訪問が0件のときは「—」）。担当者別・地域別も同じ決まりです。</p>
       </div>
     </div>
 
@@ -369,7 +365,6 @@
         <h2>フォーマットの編集</h2>
         <div class="sub-tabs">
           <button class="sub-tab active" data-fmt="report" type="button">完了報告</button>
-          <button class="sub-tab" data-fmt="nextAction" type="button">次回アクション</button>
           <button class="sub-tab" data-fmt="visit" type="button">翌日訪問リスト</button>
         </div>
         <p class="hint" id="fmtHint"></p>
@@ -379,6 +374,58 @@
           <button class="btn" type="button" id="addField"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>項目を追加</button>
           <button class="btn primary" type="button" id="saveFormat">このフォーマットを保存</button>
         </div>
+      </div>
+    </div>
+
+    <!-- このアプリについて（右上の三本線メニューから開く。ログインしている人だけ） -->
+    <div id="tab-about" class="tab-panel hidden">
+      <div class="card about">
+        <h2>このアプリについて</h2>
+        <p class="about-lead">訪問営業の「完了報告」「翌日の訪問リスト」「集計」を、ひとつのアプリでまとめて管理するためのものです。</p>
+
+        <h3>できること</h3>
+        <ul>
+          <li>翌日に回る訪問先の一覧（訪問リスト）を作る</li>
+          <li>訪問の結果（成約・検討中など）を完了報告する</li>
+          <li>報告を一覧で見る・探す・直す</li>
+          <li>期間ごとの訪問・報告・成約を集計する（管理者）</li>
+        </ul>
+
+        <h3>タブの説明</h3>
+        <dl class="about-list">
+          <dt>予定</dt><dd>今日・明日の訪問予定と、報告がまだの訪問を見られます。「報告する」からそのまま完了報告に進めます。</dd>
+          <dt>訪問リスト</dt><dd>翌日に回る訪問先を作ります。Googleマップのリンクを貼ると、店舗名や住所が自動で入ります。</dd>
+          <dt>完了報告</dt><dd>訪問の結果を入力して保存します。</dd>
+          <dt>報告一覧</dt><dd>これまでの報告を並べます。キーワード・結果・担当者で絞り込めます。</dd>
+          <dt>集計</dt><dd>期間ごとの訪問・報告・成約の数と成約率を、担当者別・地域別に見られます。（管理者のみ）</dd>
+          <dt>管理</dt><dd>メンバーの追加、入力項目（フォーマット）の編集、CSVのダウンロードができます。（管理者のみ）</dd>
+        </dl>
+
+        <h3>完了報告の入れ方</h3>
+        <ol>
+          <li><b>案件番号</b>（例：A001）を入れます。訪問リストの番号です。訪問先・訪問日・担当者名などが自動で入ります。</li>
+          <li>結果（成約・検討中・不在・断り）や、資金力・説明時間・必要性などを入れます。自動で入らなかった項目は自分で入れてください。</li>
+          <li><b>写真</b>は「写真を追加」から選びます。カメラで撮るか、アルバムから選べます（複数枚も可）。</li>
+          <li>「保存する」を押すと報告になります。1日に複数の案件を回ったときは「別の案件を追加」で、まとめて入れられます。</li>
+        </ol>
+
+        <h3>訪問リストの作り方</h3>
+        <ol>
+          <li>Googleマップでお店を開き、「共有」から「リンクをコピー」します。</li>
+          <li>訪問リストの「貼り付け」を押すと、リンク1つにつき1件のカードができます。店舗名・住所・営業時間などは自動で入ります。</li>
+          <li>リンクがないお店は「リンクなしで手入力」から、店舗名などを直接入力できます。</li>
+          <li>訪問日を入れて「まとめて保存」を押します。案件番号は保存するときに自動で付きます。</li>
+        </ol>
+
+        <h3>よくある操作</h3>
+        <ul>
+          <li><b>報告を直す・消す</b>：報告一覧の「編集」「削除」から。直せるのは自分が書いた報告と、管理者の報告です。消したときは、上の「戻る」で元に戻せます。</li>
+          <li><b>訪問の時刻を変える</b>：時刻をタップすると、回して選べます（24時間表記。例：14時30分）。</li>
+          <li><b>担当者名を自動で入れる</b>：右上の三本線メニューの「名前を設定」で自分の名前を固定すると、担当者名に自動で入ります。</li>
+          <li><b>メンバーを追加する</b>：管理者だけができます。管理タブで、メールアドレスを入れて「追加」します。</li>
+          <li><b>使えない・許可待ちと出る</b>：管理者に「利用を申請」してください。許可されると使えるようになります。</li>
+        </ul>
+        <p class="hint">画面の右上の三本線（≡）から、いつでもタブを切り替えられます。</p>
       </div>
     </div>
   </section>
