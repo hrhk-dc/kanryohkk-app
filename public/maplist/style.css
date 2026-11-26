@@ -87,10 +87,10 @@ button:disabled { opacity: .45; cursor: default; }
 .btn[disabled] { opacity: .4; }
 /* メインの操作：シアン→マゼンタの柔らかい光＋白文字（画面で1か所だけ） */
 .btn.primary {
-  /* 下に黒の下地を敷き、後ろのチップが透けないようにする */
-  background: linear-gradient(90deg, rgba(0, 229, 255, .55), rgba(255, 46, 136, .55)), #0B0D12;
-  border-color: transparent; color: #fff;
-  box-shadow: 0 0 22px rgba(255, 46, 136, .28), 0 0 14px rgba(0, 229, 255, .22), 0 6px 14px rgba(0, 0, 0, .35);
+  /* 明るいオーロラ（シアン→バイオレット→マゼンタ）を、暗くせずに使う（Round 18）。文字は白・太字 */
+  background: linear-gradient(90deg, #00E5FF, #7C5CFF 52%, #FF2E88);
+  border: 0; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  box-shadow: 0 0 20px rgba(0, 229, 255, .4), 0 0 22px rgba(255, 46, 136, .38), 0 6px 14px rgba(0, 0, 0, .3);
 }
 .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--tile); display: grid; place-items: center; }
 .pill-btn.on { background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--aurora) border-box; border: 2px solid transparent; }
@@ -218,7 +218,7 @@ button:disabled { opacity: .45; cursor: default; }
   transform: translateY(var(--dock-drop, 0px)); transition: transform .45s ease-out; /* 下のタブが隠れたら、ボタンも下へずれる（完了報告側が --dock-drop を決める） */
   position: fixed; left: 0; right: 0; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 5;
   display: flex; gap: 10px; padding: 16px 16px 10px;
-  background: linear-gradient(rgba(11, 13, 18, 0), rgba(11, 13, 18, .94) 35%);
+  background: none; /* 黒い帯は敷かない（ボタンの明るさを活かす） */
 }
 .dock .btn { flex: 1; }
 .tabs {
@@ -327,15 +327,8 @@ button:disabled { opacity: .45; cursor: default; }
 .menu-cnt { font-style: normal; font-size: 12px; color: var(--muted); background: var(--k-grey); border-radius: 999px; padding: 2px 8px; }
 .screen { padding-top: 84px; }
 
-/* ===== 横にスクロールする行の端の合図（グラデーション） ===== */
+/* 横にスクロールする行の端のグレーの縁（グラデーション）は出さない（ユーザー指示・Round 18） */
 .hwrap { position: relative; }
-.hwrap::before, .hwrap::after {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 30px; z-index: 2;
-  pointer-events: none; opacity: 0; transition: opacity .2s;
-}
-.hwrap::before { left: 0; background: linear-gradient(90deg, #16181F, rgba(22, 24, 31, 0)); }
-.hwrap::after { right: 0; background: linear-gradient(270deg, #16181F, rgba(22, 24, 31, 0)); }
-.hwrap.edge-l::before, .hwrap.edge-r::after { opacity: 1; }
 
 /* ===== 日付：今日・明日＋カレンダー ===== */
 .quick { display: flex; gap: 8px; margin: 4px 0 12px; }
