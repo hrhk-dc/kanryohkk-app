@@ -152,7 +152,7 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
     const ml = await page.evaluate(() => {
       const host = document.getElementById('mlHost');
       const sr = host.shadowRoot;
-      const navItems = sr ? [...sr.querySelectorAll('#nav a')].map((a) => a.textContent.trim()) : [];
+      const navItems = [...document.querySelectorAll('#mainNav .ml-tab')].filter((b) => getComputedStyle(b).display !== 'none').map((b) => b.textContent.trim());
       const activeScreen = sr ? (sr.querySelector('.screen.active')?.dataset.screen || '') : '';
       return {
         mode: document.body.classList.contains('mode-ml'),
@@ -168,7 +168,7 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
     });
     ok('切り替え：マップリストの画面になる（タイトル・切り替えの選択）', ml.mode && ml.title === 'マップリスト' && ml.selected === 'true', JSON.stringify({ title: ml.title, selected: ml.selected }));
     ok('切り替え：完了報告の画面は隠れ、マップリストの画面が出る', ml.dcHidden && ml.hostVisible && ml.hasShadow, JSON.stringify({ dcHidden: ml.dcHidden, hostVisible: ml.hostVisible }));
-    ok('マップリスト：下のタブ（検索・提案・訪問リスト・後で訪問）', ml.navItems.join('/') === '検索/提案/訪問リスト/後で訪問', ml.navItems.join('/'));
+    ok('マップリスト：下のタブ（検索・提案・訪問予定・後で訪問）', ml.navItems.join('/') === '検索/提案リスト/訪問予定/後で訪問', ml.navItems.join('/'));
     ok('マップリスト：最初は検索の画面', ml.activeScreen === 'search', ml.activeScreen);
     ok('390px：マップリストで横スクロールなし', !ml.hScroll);
     await page.screenshot({ path: `${SHOTS}/integ-ml-search.png` });
@@ -220,14 +220,14 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
 
     // 5b) マップリストの残りの画面（訪問リスト・後で訪問）も切り替わる
     for (const [nav, want] of [['list', 'list'], ['later', 'later'], ['proposal', 'proposal']]) {
-      await page.evaluate((n) => { document.getElementById('mlHost').shadowRoot.querySelector(`#nav a[data-nav="${n}"]`).click(); }, nav);
+      await page.evaluate((n) => { document.querySelector(`#mainNav [data-ml-nav="${n}"]`).click(); }, nav);
       await page.waitForTimeout(250);
       const act = await page.evaluate(() => document.getElementById('mlHost').shadowRoot.querySelector('.screen.active')?.dataset.screen || '');
       ok(`マップリストの下のタブ：${want} に切り替わる`, act === want, act);
     }
 
     // 5c) 後で訪問：訪問リストから移すと後で訪問に出て、訪問リストからは外れる。戻すと訪問リストに戻る
-    await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('#nav a[data-nav="list"]').click(); });
+    await page.evaluate(() => { document.querySelector('#mainNav [data-ml-nav="list"]').click(); });
     await page.waitForTimeout(250);
     await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('[data-act="later-move"][data-id="place-A"]').click(); });
     await page.waitForTimeout(800);

@@ -1,7 +1,7 @@
 // 住所・町名 → 座標（Cloudflare Pages Functions：POST /api/geocode）
 // ログイン不要。1つのIPからの連続した大量リクエストは回数制限で止める（1分に30回まで）。
 // 町名の範囲（viewport）も返す。
-import { keyOf, geocodeText, placesErrorText } from "../../lib/vla-core.js";
+import { keyOf, geocodeText, reverseText, placesErrorText } from "../../lib/vla-core.js";
 import { hitLimit, clientIp, tooMany } from "../../lib/rate-limit.js";
 
 const json = (body, status = 200) =>
@@ -16,6 +16,20 @@ export async function onRequestPost({ request, env }) {
 
   let body;
   try { body = await request.json(); } catch { return json({ ok: false, error: "住所が正しくありません" }, 400); }
+
+  // 座標 → 付近の地名（現在地の表示に使う）。既存の検索と同じキー・同じ課金
+  if (body?.reverse) {
+    const lat = Number(body.reverse.lat), lng = Number(body.reverse.lng);
+    if (!(lat >= 20 && lat <= 46 && lng >= 122 && lng <= 154)) return json({ ok: false, error: "現在地が正しくありません" }, 400);
+    try {
+      const label = await reverseText(key, lat, lng);
+      if (!label) return json({ ok: false, error: "付近の地名が見つかりませんでした" }, 404);
+      return json({ ok: true, label });
+    } catch (e) {
+      return json({ ok: false, error: placesErrorText(e, key, "付近の地名を取得できませんでした") }, 502);
+    }
+  }
+
   const q = String(body?.q || "").trim().slice(0, 200);
   if (!q) return json({ ok: false, error: "住所か町名を入力してください" }, 400);
 

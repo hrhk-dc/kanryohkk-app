@@ -35,7 +35,7 @@
   const ITEM_H = 44;
   const REASONS_BLOCK = ['出禁', '廃業・閉店', 'ターゲット外'];
   const SCREENS = ['search', 'proposal', 'list', 'later'];
-  const NAV = [['search', '検索', 'search'], ['proposal', '提案', 'target'], ['list', '訪問リスト', 'list'], ['later', '後で訪問', 'later']];
+  const NAV = [['search', '検索', 'search'], ['proposal', '提案', 'target'], ['list', '訪問予定', 'list'], ['later', '後で訪問', 'later']];
   const SITE_URL = 'https://kanryohkk-app.pages.dev';
 
   // ---------- 線のアイコン（1.5px・塗りつぶしなし） ----------
@@ -343,7 +343,7 @@
       ${a.mode === 'address'
         ? `<label class="field"><span class="sr">住所・町名</span><input id="addr" type="text" placeholder="例：〇〇区〇〇" value="${esc(a.address)}" autocomplete="off"></label>`
         : `<button class="btn wide" data-act="gps">${ic('gps')}${a.lat == null ? '現在地を取得する' : '現在地を取得済み（取り直す）'}</button>
-           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : '現在地の周りから探します。'}</p>`}`;
+           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : (a.place ? `${esc(a.place)}付近の周りから探します。` : '現在地の周りから探します。')}</p>`}`;
   }
 
   function renderRadius() {
@@ -473,7 +473,7 @@
     const inList = inVisit(s.id) || inLater(s.id);
     const banner = s.visited
       ? `<div class="banner">${ic('info')}訪問済みの店です</div>`
-      : inList ? `<div class="banner">${ic('info')}訪問リストに入っています</div>` : '';
+      : inList ? `<div class="banner">${ic('info')}訪問予定に入っています</div>` : '';
     return `<article class="card shop">
       ${banner}
       <div class="shop-head">
@@ -492,7 +492,7 @@
         ${s.insta ? `<a class="pill-btn" href="https://www.instagram.com/${esc(s.insta)}" target="_blank" rel="noopener">${ic('insta')}@${esc(s.insta)}</a>` : ''}
       </div>
       <div class="actions">
-        <button class="btn" data-act="add" data-id="${s.id}" ${inVisit(s.id) ? 'disabled' : ''}>${ic('plus')}${inVisit(s.id) ? '追加済み' : '訪問リストに追加'}</button>
+        <button class="btn" data-act="add" data-id="${s.id}" ${inVisit(s.id) ? 'disabled' : ''}>${ic('plus')}${inVisit(s.id) ? '追加済み' : '訪問予定に追加'}</button>
         <button class="btn" data-act="copy-map" data-id="${s.id}">${ic('copy')}Map URLコピー</button>
         <a class="btn icon" href="${esc(mapUrl(s))}" target="_blank" rel="noopener" aria-label="地図で開く">${ic('map')}</a>
         <button class="btn text" data-act="block" data-id="${s.id}">${ic('block')}訪問NG</button>
@@ -511,8 +511,7 @@
     const actions = kind === 'visit'
       ? `${common}<button class="btn" data-act="later-move" data-id="${s.id}">後で訪問</button>
          <button class="btn danger" data-act="remove" data-src="visit" data-id="${s.id}">${ic('x')}外す</button>`
-      : `<button class="btn" data-act="back-visit" data-id="${s.id}">${ic('back')}訪問リストに戻す</button>
-         <button class="btn" data-act="go-dc">${ic('ext')}完了報告へ</button>
+      : `<button class="btn" data-act="back-visit" data-id="${s.id}">${ic('back')}訪問予定に戻す</button>
          ${common}
          <button class="btn danger" data-act="remove" data-src="later" data-id="${s.id}">${ic('x')}外す</button>`;
     return `<article class="card visit">
@@ -536,7 +535,7 @@
     const items = state.visit;
     $('#lCount').textContent = `${items.length}件`;
     if (!items.length) {
-      $('#lList').innerHTML = `<div class="empty"><p>訪問リストは空です。</p><p class="hint">提案リストから店を追加できます。</p></div>`;
+      $('#lList').innerHTML = `<div class="empty"><p>訪問予定は空です。</p><p class="hint">提案リストから店を追加できます。</p></div>`;
       return;
     }
     const groups = new Map();
@@ -557,12 +556,11 @@
     $('#gCount').textContent = `${items.length}件`;
     $('#gList').innerHTML = items.length
       ? items.map((it) => visitCard(it, 'later')).join('')
-      : `<div class="empty"><p>後で訪問の店はありません。</p><p class="hint">訪問リストの「後で訪問」から移せます。</p></div>`;
+      : `<div class="empty"><p>後で訪問の店はありません。</p><p class="hint">訪問予定の「後で訪問」から移せます。</p></div>`;
   }
 
-  function renderNav() {
-    $('#nav').innerHTML = NAV.map(([k, l, i]) => `<a href="#" data-nav="${k}">${ic(i)}<span>${l}</span><em class="bdg" data-badge="${k}"></em></a>`).join('');
-  }
+  // 下のタブは、完了報告アプリの下のタブ（同じ棒・同じ見た目）を使う。ここでは作らない（app.js の mlTabs）
+  function renderNav() {}
   function renderBadges() {
     const n = { list: state.visit.length, later: state.later.length };
     $$('[data-badge]').forEach((el) => { const c = n[el.dataset.badge]; el.textContent = c ? String(c) : ''; });
@@ -634,9 +632,10 @@
   function showScreen() {
     const name = currentName();
     $$('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
-    $$('#nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === name));
     renderAll();
     window.scrollTo(0, 0);
+    // 下のタブ（完了報告アプリの棒）の選ばれている印を合わせる
+    window.dispatchEvent(new CustomEvent('ml-screen', { detail: name }));
   }
   function go(name) {
     curScreen = name;
@@ -688,9 +687,17 @@
     navigator.geolocation.getCurrentPosition((p) => {
       state.area.lat = p.coords.latitude;
       state.area.lng = p.coords.longitude;
+      state.area.place = null;
       state.userPos = { lat: p.coords.latitude, lng: p.coords.longitude };
       renderArea();
       toast('現在地を取得しました');
+      // 付近の地名を取って、表示を差し替える。取れなければ「現在地の周りから探します。」のまま
+      const at = state.userPos;
+      D.placeName(at).then((name) => {
+        if (state.userPos !== at) return; // 取り直していたら、古い結果は捨てる
+        state.area.place = name;
+        renderArea();
+      }).catch(() => {});
       if (done) done();
     }, () => toast('現在地を取得できませんでした'), { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
   }
@@ -760,8 +767,8 @@
     const s = findIn(state.pool, id) || findShop(id);
     if (!s || inVisit(id)) return;
     D.visits.add(stripScores(s), state.date)
-      .then(() => toast('訪問リストに追加しました'))
-      .catch((e) => toast((e && e.message) || '訪問リストに追加できませんでした。もう一度お試しください'));
+      .then(() => toast('訪問予定に追加しました'))
+      .catch((e) => toast((e && e.message) || '訪問予定に追加できませんでした。もう一度お試しください'));
   }
 
   function stripScores(s) {
@@ -778,7 +785,7 @@
       // 同じ訪問のまま、後で訪問の印だけを付け外しする（訪問リストと同じデータ）
       await D.visits.setLater(id, to === 'later');
       syncVisits();
-      toast(to === 'later' ? '後で訪問に移しました' : '訪問リストに戻しました');
+      toast(to === 'later' ? '後で訪問に移しました' : '訪問予定に戻しました');
     } catch (e) {
       toast((e && e.message) || '移せませんでした。もう一度お試しください');
     }
@@ -956,32 +963,12 @@
   function closeMenu() {}
 
   // お気に入り条件（検索画面の、お気に入りの場所へ移動する）
+  // メニューの「お気に入り条件」は、検索の画面を上から開くだけ（勝手に下へスクロールしない）
   function goPresets() {
     go('search');
-    setTimeout(() => {
-      const c = $('#presetCard');
-      // 固定ヘッダー（約58px）の下に、カードの上端を合わせる
-      if (c) window.scrollTo({ top: c.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
-    }, 80);
   }
 
-  // ---------- 下のタブ：下にスクロールするとゆっくり隠れ、上にスクロールするとゆっくり出る ----------
-  let tabsLastY = window.scrollY;
-  let tabsRaf = 0;
-  function updateTabsVisibility() {
-    tabsRaf = 0;
-    const tabs = $('#nav');
-    if (!tabs) return;
-    const y = Math.max(0, window.scrollY);
-    const dy = y - tabsLastY;
-    if (y < 8) tabs.classList.remove('hide');       // 一番上では必ず出す
-    else if (dy > 6) tabs.classList.add('hide');    // 下へスクロール：隠す
-    else if (dy < -6) tabs.classList.remove('hide'); // 上へスクロール：出す
-    if (Math.abs(dy) > 6) tabsLastY = y;
-  }
-  window.addEventListener('scroll', () => {
-    if (!tabsRaf) tabsRaf = requestAnimationFrame(updateTabsVisibility);
-  }, { passive: true });
+  // 下のタブの出し入れ（ゆっくり隠れる・少し上に動かすと出る）は、完了報告アプリ側（app.js）が両方のモードで行う
 
   // ---------- 操作の登録（クリックの委任） ----------
   const ACT = {
@@ -1099,6 +1086,7 @@
     window.mlActions = {
       blockList: () => openBlockList(),
       presets: () => goPresets(),
+      go: (name) => go(name), // 下のタブ（完了報告アプリの棒）から画面を切り替える
     };
     await refreshUser(); // 画面は先に出し、ログイン状態は後から反映する
   }
