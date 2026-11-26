@@ -226,6 +226,20 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
       ok(`マップリストの下のタブ：${want} に切り替わる`, act === want, act);
     }
 
+    // 5c) 後で訪問：訪問リストから移すと後で訪問に出て、訪問リストからは外れる。戻すと訪問リストに戻る
+    await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('#nav a[data-nav="list"]').click(); });
+    await page.waitForTimeout(250);
+    await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('[data-act="later-move"][data-id="place-A"]').click(); });
+    await page.waitForTimeout(800);
+    const laterNames = await page.evaluate(() => [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#gList .shop-name')].map((e) => e.textContent.trim()));
+    const visitNames1 = await page.evaluate(() => [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#lList .shop-name')].map((e) => e.textContent.trim()));
+    ok('後で訪問：訪問リストから移すと、後で訪問に出る', laterNames.includes('テスト寿司店'), JSON.stringify(laterNames));
+    ok('後で訪問：移したあと、訪問リストからは外れる', !visitNames1.includes('テスト寿司店'), JSON.stringify(visitNames1));
+    await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('[data-act="back-visit"][data-id="place-A"]').click(); });
+    await page.waitForTimeout(800);
+    const visitNames2 = await page.evaluate(() => [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#lList .shop-name')].map((e) => e.textContent.trim()));
+    ok('後で訪問：戻すと、訪問リストに戻る', visitNames2.includes('テスト寿司店'), JSON.stringify(visitNames2));
+
     // 6) 完了報告の画面に戻して、同じ訪問リストが見えるか（予定の訪問・訪問リストタブ）
     await page.click('.app-seg[data-app="dc"]');
     await page.waitForTimeout(700);

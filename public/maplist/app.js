@@ -179,7 +179,7 @@
     openOnly: true,
     expanded: new Set(),
     visit: [],                   // [{id, shop, visitDate}]。完了報告アプリの訪問リスト（visits）と同じもの（syncVisits で読む）
-    later: LS.get('later', []),
+    later: [],                   // 後で訪問：完了報告の visits（ml_later の印）。syncVisits で読む
     listSort: 'default',
     userPos: null,
   };
@@ -737,30 +737,23 @@
       <div class="stack"><button class="btn text wide" data-act="dpick-none" data-id="${id}" data-kind="${kind}">日付未定にする</button></div>`;
   }
 
-  async function setVisitDate(id, date, kind) {
-    if (kind !== 'later') {
-      try {
-        await D.visits.setDate(id, date);
-      } catch (e) {
-        toast((e && e.message) || '日付を変えられませんでした。もう一度お試しください');
-      }
-      return; // 訪問リストの表示は、完了報告アプリの変更を受けて読み直す
+  async function setVisitDate(id, date) {
+    try {
+      await D.visits.setDate(id, date); // 訪問リスト・後で訪問とも、同じ visits の日付を変える
+    } catch (e) {
+      toast((e && e.message) || '日付を変えられませんでした。もう一度お試しください');
     }
-    const it = findIn(state.later, id);
-    if (it) it.visitDate = date;
-    saveAll();
-    renderAll();
+    // 表示は、完了報告アプリの変更を受けて読み直す（dc-visits-changed）
   }
 
   // ---------- 訪問リストの操作 ----------
-  // 「後で訪問」だけ、この端末に保存する（訪問リストは完了報告アプリの visits に入るので、ここには保存しない）
-  function saveAll() {
-    LS.set('later', state.later);
-  }
+  // 保存は、完了報告アプリの visits に対して行う（この端末には何も保存しない）
+  function saveAll() {}
 
-  // 訪問リストの読み直し（完了報告アプリの visits が変わったとき・画面を開いたとき）
+  // 訪問リストと後で訪問の読み直し（完了報告アプリの visits が変わったとき・画面を開いたとき）
   function syncVisits() {
     state.visit = D.visits.list();
+    state.later = D.visits.laterList();
   }
 
   function addVisit(id) {
@@ -782,14 +775,9 @@
     const it = findIn(src, id);
     if (!it) return;
     try {
-      if (to === 'later') {
-        await D.visits.remove(id);
-        state.later.unshift({ ...it });
-      } else {
-        await D.visits.add(it.shop, it.visitDate || state.date);
-        state.later = state.later.filter((x) => x.id !== id);
-      }
-      saveAll();
+      // 同じ訪問のまま、後で訪問の印だけを付け外しする（訪問リストと同じデータ）
+      await D.visits.setLater(id, to === 'later');
+      syncVisits();
       toast(to === 'later' ? '後で訪問に移しました' : '訪問リストに戻しました');
     } catch (e) {
       toast((e && e.message) || '移せませんでした。もう一度お試しください');
@@ -800,12 +788,7 @@
   async function removeFrom(id, src) {
     if (!window.confirm('この店を外しますか？')) return;
     try {
-      if (src === 'visit') {
-        await D.visits.remove(id);
-      } else {
-        state.later = state.later.filter((x) => x.id !== id);
-        saveAll();
-      }
+      await D.visits.remove(id); // 訪問リストでも後で訪問でも、同じ visits から外す
       toast('外しました');
     } catch (e) {
       toast((e && e.message) || '外せませんでした。もう一度お試しください');
