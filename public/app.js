@@ -656,9 +656,6 @@ function applyAccess() {
   $("#userEmail").textContent = currentUser.email + (isAdmin() ? "（管理者）" : "");
   $("#adminTab").classList.toggle("hidden", !isAdmin());
   $("#statsTab").classList.toggle("hidden", !isAdmin());
-  $("#menuAdminTab").classList.toggle("hidden", !isAdmin());   // メニューの項目も下のタブと同じ条件
-  $("#menuStatsTab").classList.toggle("hidden", !isAdmin());
-  $("#menuTabs").classList.toggle("hidden", !ok);              // 承認待ちの画面ではタブへの移動を出さない
   if (!isAdmin() && (!$("#tab-admin").classList.contains("hidden") || !$("#tab-stats").classList.contains("hidden"))) showTab("today");
   if (!ok) { stopData(); renderPending(); return; }
   if (!$("#visitDate").value) $("#visitDate").value = tomorrow();

@@ -512,7 +512,6 @@
       ? `${common}<button class="btn" data-act="later-move" data-id="${s.id}">後で訪問</button>
          <button class="btn danger" data-act="remove" data-src="visit" data-id="${s.id}">${ic('x')}外す</button>`
       : `<button class="btn" data-act="back-visit" data-id="${s.id}">${ic('back')}訪問予定に戻す</button>
-         <button class="btn" data-act="go-dc">${ic('ext')}完了報告へ</button>
          ${common}
          <button class="btn danger" data-act="remove" data-src="later" data-id="${s.id}">${ic('x')}外す</button>`;
     return `<article class="card visit">
