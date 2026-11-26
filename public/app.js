@@ -956,6 +956,8 @@ function setMenu(open) {
 }
 menuBtn.addEventListener("click", () => setMenu(!menuLayer.classList.contains("open")));
 $("#menuScrim").addEventListener("click", () => setMenu(false));
+// 外のアプリへのリンク（新しいタブで開く）をタップしたら、メニューを閉じる
+document.querySelectorAll("a.menu-item").forEach((a) => a.addEventListener("click", () => setMenu(false)));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuLayer.classList.contains("open")) setMenu(false); });
 document.querySelectorAll("[data-menu-tab]").forEach((b) => b.addEventListener("click", () => {
   setMenu(false);
