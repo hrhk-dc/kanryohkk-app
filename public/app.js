@@ -128,7 +128,9 @@ const ICON_PATHS = {
   link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
   logout: '<path d="M14 4.5h3.5a2 2 0 012 2v11a2 2 0 01-2 2H14M10 16l4-4-4-4M14 12H4"/>',
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
-  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>'
+  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>',
+  menu: '<path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15"/>',
+  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'
 };
 const ic = (name, cls = "") => `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] || ""}</svg>`;
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -359,7 +361,7 @@ document.addEventListener("click", (e) => {
   if (btn) copyText(btn.dataset.copy);
 });
 
-$("#copyAppLink").addEventListener("click", () => copyText(window.location.origin + "/"));
+$("#copyAppLink").addEventListener("click", () => { setMenu(false); copyText(window.location.origin + "/"); });
 
 /* ---------- ホーム画面アプリ（PWA） ---------- */
 if ("serviceWorker" in navigator) {
@@ -597,7 +599,7 @@ $("#resetBtn").addEventListener("click", async () => {
   catch (err) { showError($("#authError"), err, "パスワード再設定メールの送信"); }
 });
 
-$("#logoutBtn").addEventListener("click", () => signOut(auth));
+$("#logoutBtn").addEventListener("click", () => { setMenu(false); signOut(auth); });
 $("#resendVerify").addEventListener("click", async () => {
   if (!currentUser) return;
   try { await sendEmailVerification(currentUser); toast("確認メールを再送しました"); }
@@ -622,6 +624,7 @@ onAuthStateChanged(auth, (user) => {
     $("#pendingView").classList.add("hidden");
     $("#logoutBtn").classList.add("hidden");
     $("#userEmail").textContent = "";
+    setMenu(false);
     return;
   }
 
@@ -648,6 +651,9 @@ function applyAccess() {
   $("#userEmail").textContent = currentUser.email + (isAdmin() ? "（管理者）" : "");
   $("#adminTab").classList.toggle("hidden", !isAdmin());
   $("#statsTab").classList.toggle("hidden", !isAdmin());
+  $("#menuAdminTab").classList.toggle("hidden", !isAdmin());   // メニューの項目も下のタブと同じ条件
+  $("#menuStatsTab").classList.toggle("hidden", !isAdmin());
+  $("#menuTabs").classList.toggle("hidden", !ok);              // 承認待ちの画面ではタブへの移動を出さない
   if (!isAdmin() && (!$("#tab-admin").classList.contains("hidden") || !$("#tab-stats").classList.contains("hidden"))) showTab("today");
   if (!ok) { stopData(); renderPending(); return; }
   if (!$("#visitDate").value) $("#visitDate").value = tomorrow();
@@ -778,6 +784,7 @@ async function saveMyName(name) {
   await setDoc(doc(db, "users", currentUser.uid), { name, email: currentUser.email, updatedAt: serverTimestamp() }, { merge: true });
 }
 $("#myNameLabel").addEventListener("click", () => {
+  setMenu(false);
   $("#namePanel").classList.toggle("hidden");
   $("#myNameInput").value = myName;
   $("#myNameInput").focus();
@@ -805,6 +812,7 @@ document.addEventListener("change", async (e) => {
 function showTab(name) {
   if ((name === "stats" || name === "admin") && !isAdmin()) name = "today"; // 集計・管理は管理者のみ
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll("[data-menu-tab]").forEach((b) => b.classList.toggle("current", b.dataset.menuTab === name));
   ["today", "list", "form", "visits", "stats", "admin"].forEach((n) => $(`#tab-${n}`)?.classList.toggle("hidden", n !== name));
   if (name === "today") renderToday();
   if (name === "stats") renderStats();
@@ -928,6 +936,30 @@ function layoutNav(animate) {
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
   if ((t.dataset.tab === "admin" || t.dataset.tab === "stats") && !isAdmin()) return;
   showTab(t.dataset.tab);
+}));
+
+/* ---------- 右上のメニュー（三本線）：タブへの移動・リンクのコピー・名前・ログアウト ---------- */
+const menuBtn = $("#menuBtn");
+const menuLayer = $("#menuLayer");
+// 開いている間は後ろの画面を触れない（下の幕で覆い、ヘッダー・本体は inert にする）
+function setMenu(open) {
+  menuLayer.classList.toggle("open", open);
+  menuLayer.setAttribute("aria-hidden", String(!open));
+  menuBtn.setAttribute("aria-expanded", String(open));
+  menuBtn.setAttribute("aria-label", open ? "メニューを閉じる" : "メニューを開く");
+  menuBtn.innerHTML = ic(open ? "close" : "menu");
+  document.body.classList.toggle("menu-open", open);
+  document.querySelector("header.topbar")?.toggleAttribute("inert", open);
+  document.querySelector("main")?.toggleAttribute("inert", open);
+}
+menuBtn.addEventListener("click", () => setMenu(!menuLayer.classList.contains("open")));
+$("#menuScrim").addEventListener("click", () => setMenu(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuLayer.classList.contains("open")) setMenu(false); });
+document.querySelectorAll("[data-menu-tab]").forEach((b) => b.addEventListener("click", () => {
+  setMenu(false);
+  const name = b.dataset.menuTab;
+  if ((name === "admin" || name === "stats") && !isAdmin()) return; // 集計・管理は管理者のみ
+  showTab(name);
 }));
 
 /* ---------- 項目の入力欄・表示・チェック（共通） ---------- */
