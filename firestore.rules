@@ -111,6 +111,14 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
+    // 訪問NG（訪問リストアプリ）：メンバーだけ読み書きできる。登録するのは本人
+    match /vla_blocks/{placeId} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember()
+        && request.resource.data.keys().hasOnly(['name', 'reason', 'at', 'createdBy', 'createdByName'])
+        && request.resource.data.createdBy == request.auth.uid;
+    }
+
     // それ以外はすべて禁止
     match /{document=**} {
       allow read, write: if false;
