@@ -13,7 +13,6 @@ import { INDUSTRIES, classifyIndustry } from "./industry.js";
 /* ---------- 設定 ---------- */
 const ADMIN_EMAIL = "hrhk@dc-hm.com";
 const MAPS_REGEX = /^https?:\/\/(maps\.app\.goo\.gl\/|goo\.gl\/maps\/|(www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+)/i;
-const CLAUDE_TEMPLATE = (url) => `このGoogleマップのリンクからデモサイトを作って：${url}`;
 
 const TYPE_LABELS = {
   text: "テキスト", textarea: "長文", select: "選択式", url: "URL", maps: "GoogleマップURL",
@@ -52,6 +51,7 @@ const FORMATS = {
       { id: "caseNo", label: "案件番号", type: "caseNo", required: false, locked: true },
       { id: "caseName", label: "案件名", type: "text", required: true },
       { id: "visitTo", label: "訪問先", type: "text", required: true },
+      { id: "visitDate", label: "訪問日", type: "date", required: false },
       { id: "personName", label: "担当者名", type: "text", required: false },
       { id: "receivedAt", label: "受付日時", type: "datetime", required: false },
       { id: "result", label: "結果", type: "select", required: true, options: ["成約", "検討中", "不在", "断り"] },
@@ -59,15 +59,6 @@ const FORMATS = {
       { id: "wealth", label: "お客様の資金力（お金のあるなし：1=少ない 〜 10=とても多い）", type: "select", required: false, options: ["1","2","3","4","5","6","7","8","9","10"] },
       { id: "explainTime", label: "説明時間（分）", type: "number", required: false },
       { id: "memo", label: "メモ", type: "textarea", required: false }
-    ]
-  },
-  nextAction: {
-    doc: "nextActionFormat", title: "次回アクション",
-    hint: "完了報告と一緒に入力する次回アクションの項目です。ほかのフォーマットと同じように、項目の追加・削除・名前変更・種類・必須・並び順を自由に変えられます。",
-    fields: [
-      { id: "content", label: "内容", type: "textarea", required: true },
-      { id: "date", label: "予定日", type: "date", required: false },
-      { id: "mapsUrl", label: "GoogleマップのURL", type: "maps", required: true }
     ]
   },
   visit: {
@@ -128,16 +119,22 @@ const ICON_PATHS = {
   link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
   logout: '<path d="M14 4.5h3.5a2 2 0 012 2v11a2 2 0 01-2 2H14M10 16l4-4-4-4M14 12H4"/>',
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
-  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>'
+  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>',
+  menu: '<path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15"/>',
+  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.01"/>'
 };
 const ic = (name, cls = "") => `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] || ""}</svg>`;
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d); };
+// 時刻はすべて24時間表記（14時30分・09時）。値は "HH:MM"（0〜23時）で保存されている
 const fmtHour = (v) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(v || "");
-  return m ? (m[2] === "00" ? `${+m[1]}時` : `${+m[1]}時${+m[2]}分`) : (v || "");
+  if (!m) return v || "";
+  const h = String(+m[1]).padStart(2, "0");
+  return m[2] === "00" ? `${h}時` : `${h}時${m[2]}分`;
 };
 // 時刻は10分刻み。既存データ（分がずれているもの）は直前の10分に丸めて選択状態にする
 const snap10 = (v) => {
@@ -269,6 +266,12 @@ const fmtDateJa = (s) => {
   const w = "日月火水木金土"[new Date(y, m - 1, d).getDay()];
   return `${y}年${m}月${d}日（${w}）`;
 };
+// 短い日付（報告カードの1行に入る形）：2026/11/25（水）
+const dateShortJa = (s) => {
+  if (!s) return "";
+  const [y, m, d] = s.split("-").map(Number);
+  return `${y}/${m}/${d}（${"日月火水木金土"[new Date(y, m - 1, d).getDay()]}）`;
+};
 
 let toastTimer;
 function toast(msg) {
@@ -359,7 +362,7 @@ document.addEventListener("click", (e) => {
   if (btn) copyText(btn.dataset.copy);
 });
 
-$("#copyAppLink").addEventListener("click", () => copyText(window.location.origin + "/"));
+$("#copyAppLink").addEventListener("click", () => { setMenu(false); copyText(window.location.origin + "/"); });
 
 /* ---------- ホーム画面アプリ（PWA） ---------- */
 if ("serviceWorker" in navigator) {
@@ -406,8 +409,6 @@ let currentUser = null;
 const formats = Object.fromEntries(Object.entries(FORMATS).map(([k, v]) => [k, clone(v.fields)]));
 const drafts = {};
 let adminSection = "report";
-let naSectionRequired = true;   // 次回アクションを必須にするか（管理者が切り替え）
-let draftNaRequired = true;
 let reports = [];
 let visits = [];
 let editingId = null;
@@ -597,7 +598,7 @@ $("#resetBtn").addEventListener("click", async () => {
   catch (err) { showError($("#authError"), err, "パスワード再設定メールの送信"); }
 });
 
-$("#logoutBtn").addEventListener("click", () => signOut(auth));
+$("#logoutBtn").addEventListener("click", () => { setMenu(false); signOut(auth); });
 $("#resendVerify").addEventListener("click", async () => {
   if (!currentUser) return;
   try { await sendEmailVerification(currentUser); toast("確認メールを再送しました"); }
@@ -622,6 +623,7 @@ onAuthStateChanged(auth, (user) => {
     $("#pendingView").classList.add("hidden");
     $("#logoutBtn").classList.add("hidden");
     $("#userEmail").textContent = "";
+    setMenu(false);
     return;
   }
 
@@ -648,6 +650,9 @@ function applyAccess() {
   $("#userEmail").textContent = currentUser.email + (isAdmin() ? "（管理者）" : "");
   $("#adminTab").classList.toggle("hidden", !isAdmin());
   $("#statsTab").classList.toggle("hidden", !isAdmin());
+  $("#menuAdminTab").classList.toggle("hidden", !isAdmin());   // メニューの項目も下のタブと同じ条件
+  $("#menuStatsTab").classList.toggle("hidden", !isAdmin());
+  $("#menuTabs").classList.toggle("hidden", !ok);              // 承認待ちの画面ではタブへの移動を出さない
   if (!isAdmin() && (!$("#tab-admin").classList.contains("hidden") || !$("#tab-stats").classList.contains("hidden"))) showTab("today");
   if (!ok) { stopData(); renderPending(); return; }
   if (!$("#visitDate").value) $("#visitDate").value = tomorrow();
@@ -662,14 +667,10 @@ function subscribe() {
     unsubs.push(onSnapshot(doc(db, "settings", def.doc), (snap) => {
       const data = snap.exists() ? snap.data() : null;
       formats[key] = data && Array.isArray(data.fields) && data.fields.length ? data.fields : clone(def.fields);
-      if (key === "report") { reportPhotoAdded = !!(data && data.photoFieldAdded); reportWealthAdded = !!(data && data.wealthFieldAdded); reportExplainAdded = !!(data && data.explainTimeFieldAdded); }
+      if (key === "report") { reportPhotoAdded = !!(data && data.photoFieldAdded); reportWealthAdded = !!(data && data.wealthFieldAdded); reportExplainAdded = !!(data && data.explainTimeFieldAdded); reportVisitDateAdded = !!(data && data.visitDateFieldAdded); }
       normalizeFormat(key);
       if (key === "visit") { visitAutoAdded = !!(data && data.autoFieldsAdded); addAutoVisitFields(); }
-      if (key === "nextAction") {
-        naSectionRequired = data && typeof data.sectionRequired === "boolean" ? data.sectionRequired : true;
-        if (isAdmin()) draftNaRequired = naSectionRequired;
-      }
-      if (key === "report" || key === "nextAction") { syncCases(); renderReportForm(); }
+      if (key === "report") { syncCases(); renderReportForm(); }
       if (key === "visit") { if (!editingVisitId) renderVisitRows(); renderVisitList(); }
       if (isAdmin()) { drafts[key] = clone(formats[key]); if (key === adminSection) renderFieldEditor(); }
     }, (err) => showBanner(err, "フォーマットの読み込み")));
@@ -721,6 +722,8 @@ function addAutoVisitFields() {
 let reportPhotoAdded = false;
 let reportWealthAdded = false;
 let reportExplainAdded = false;
+let reportVisitDateAdded = false;
+/* 訪問日の項目（完了報告）。保存済みのフォーマットにも、一度だけ「訪問先」の次に入れる */
 /* 説明時間の項目（項目名に「説明時間」を含むもの）。値は「分」 */
 const explainItemOf = (items) => (items || []).find((i) => (i.id === "explainTime" || /説明時間/.test(i.label || "")) && i.value);
 // サービスの必要性（ラベルで探す。報告に保存された項目名と値をそのまま使う）
@@ -742,7 +745,10 @@ function normalizeFormat(key) {
     const c = formats.visit.find((f) => f.id === "category" || /^業種$/.test(f.label || ""));
     if (c) { c.type = "select"; c.options = [...INDUSTRIES]; }
   }
-  if (key === "nextAction") formats.nextAction.forEach((f) => delete f.locked);
+  if (key === "report" && !reportVisitDateAdded && !formats.report.some((f) => f.id === "visitDate")) {
+    const at = formats.report.findIndex((f) => f.id === "visitTo");
+    formats.report.splice(at >= 0 ? at + 1 : formats.report.length, 0, clone(FORMATS.report.fields.find((f) => f.id === "visitDate")));
+  }
   if (key === "report" && !reportPhotoAdded && !formats.report.some((f) => f.type === "photo")) {
     formats.report.push({ id: "photos", label: "写真", type: "photo", required: false });
   }
@@ -780,6 +786,7 @@ async function saveMyName(name) {
   await setDoc(doc(db, "users", currentUser.uid), { name, email: currentUser.email, updatedAt: serverTimestamp() }, { merge: true });
 }
 $("#myNameLabel").addEventListener("click", () => {
+  setMenu(false);
   $("#namePanel").classList.toggle("hidden");
   $("#myNameInput").value = myName;
   $("#myNameInput").focus();
@@ -807,7 +814,8 @@ document.addEventListener("change", async (e) => {
 function showTab(name) {
   if ((name === "stats" || name === "admin") && !isAdmin()) name = "today"; // 集計・管理は管理者のみ
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
-  ["today", "list", "form", "visits", "stats", "admin"].forEach((n) => $(`#tab-${n}`)?.classList.toggle("hidden", n !== name));
+  document.querySelectorAll("[data-menu-tab]").forEach((b) => b.classList.toggle("current", b.dataset.menuTab === name));
+  ["today", "list", "form", "visits", "stats", "admin", "about"].forEach((n) => $(`#tab-${n}`)?.classList.toggle("hidden", n !== name));
   if (name === "today") renderToday();
   if (name === "stats") renderStats();
   window.scrollTo(0, 0);
@@ -932,6 +940,30 @@ document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () 
   showTab(t.dataset.tab);
 }));
 
+/* ---------- 右上のメニュー（三本線）：タブへの移動・リンクのコピー・名前・ログアウト ---------- */
+const menuBtn = $("#menuBtn");
+const menuLayer = $("#menuLayer");
+// 開いている間は後ろの画面を触れない（下の幕で覆い、ヘッダー・本体は inert にする）
+function setMenu(open) {
+  menuLayer.classList.toggle("open", open);
+  menuLayer.setAttribute("aria-hidden", String(!open));
+  menuBtn.setAttribute("aria-expanded", String(open));
+  menuBtn.setAttribute("aria-label", open ? "メニューを閉じる" : "メニューを開く");
+  menuBtn.innerHTML = ic(open ? "close" : "menu");
+  document.body.classList.toggle("menu-open", open);
+  document.querySelector("header.topbar")?.toggleAttribute("inert", open);
+  document.querySelector("main")?.toggleAttribute("inert", open);
+}
+menuBtn.addEventListener("click", () => setMenu(!menuLayer.classList.contains("open")));
+$("#menuScrim").addEventListener("click", () => setMenu(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuLayer.classList.contains("open")) setMenu(false); });
+document.querySelectorAll("[data-menu-tab]").forEach((b) => b.addEventListener("click", () => {
+  setMenu(false);
+  const name = b.dataset.menuTab;
+  if ((name === "admin" || name === "stats") && !isAdmin()) return; // 集計・管理は管理者のみ
+  showTab(name);
+}));
+
 /* ---------- 項目の入力欄・表示・チェック（共通） ---------- */
 function fieldInput(f, value = "") {
   const attrs = `data-field-id="${esc(f.id)}"${f.required ? " required" : ""}`;
@@ -947,7 +979,6 @@ function fieldInput(f, value = "") {
     case "maps": return `<input type="url" ${attrs} placeholder="https://maps.app.goo.gl/..." value="${esc(value)}">
       <div class="btn-row">
         <button class="btn small" type="button" data-copy-field="url">URLをコピー</button>
-        <button class="btn small" type="button" data-copy-field="claude">${ic("code")}Claude Code用の指示をコピー</button>
       </div>`;
     case "date": return `<input type="date" ${attrs} value="${esc(value)}">`;
     case "datetime": return `<input type="datetime-local" ${attrs} value="${esc(value)}">`;
@@ -999,7 +1030,7 @@ function fillFromCaseNo(input) {
   const byId = Object.fromEntries(src.map((i) => [i.id, i.value]));
   const byLabel = Object.fromEntries(src.map((i) => [i.label, i.value]));
   const shop = byId.shopName || src.find((i) => i.type === "text" && i.value)?.value || "";
-  const extra = { visitTo: shop, caseName: shop, demoUrl: v.demoUrl || "" };
+  const extra = { visitTo: shop, caseName: shop, demoUrl: v.demoUrl || "", visitDate: v.visitDate || "" };
   let filled = 0;
   const put = (el, val) => { if (el && !el.value && val) { el.value = val; filled++; } };
   card?.querySelectorAll(".case-fields [data-field-id]").forEach((el) => {
@@ -1007,12 +1038,6 @@ function fillFromCaseNo(input) {
     if (id === "caseNo") return;
     const label = formats.report.find((f) => f.id === id)?.label;
     put(el, byId[id] ?? byLabel[label] ?? extra[id]);
-  });
-  // 次回アクションのGoogleマップ欄にも訪問先のマップを入れる
-  const maps = src.find((i) => i.type === "maps" && i.value)?.value;
-  card?.querySelectorAll(".case-na [data-field-id]").forEach((el) => {
-    const f = formats.nextAction.find((x) => x.id === el.dataset.fieldId);
-    if (f?.type === "maps") put(el, maps);
   });
   if (hit) hit.textContent = `${fmtDateJa(v.visitDate)}訪問予定「${shop}」の情報を${filled ? `${filled}項目入れました` : "確認しました（空欄はありません）"}`;
 }
@@ -1026,13 +1051,13 @@ document.addEventListener("input", (e) => {
   if (visits.some((x) => norm(x.caseNo) === norm(el.value))) fillFromCaseNo(el);
 });
 
-/* 入力欄の中の「URLをコピー」「Claude Code用の指示をコピー」 */
+/* 入力欄の中の「URLをコピー」 */
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-copy-field]");
   if (!btn) return;
   const url = (btn.closest("label")?.querySelector("input")?.value || "").trim();
   if (!url) { toast("GoogleマップのURLを入力してください"); return; }
-  copyText(btn.dataset.copyField === "claude" ? CLAUDE_TEMPLATE(url) : url);
+  copyText(url);
 });
 
 function collectItems(container, fields) {
@@ -1065,12 +1090,12 @@ function valueHtml(i) {
     return `<a href="${esc(i.value)}" target="_blank" rel="noopener">${esc(i.value)}</a>
       <div class="btn-row">
         <button class="btn small" type="button" data-copy="${esc(i.value)}">URLをコピー</button>
-        <button class="btn small" type="button" data-copy="${esc(CLAUDE_TEMPLATE(i.value))}">${ic("code")}Claude Code用の指示をコピー</button>
       </div>`;
   }
   if (i.type === "photo") return `<span class="ph-list">${photoThumbs(String(i.value).split(","))}</span>`;
   if (i.type === "datetime") return esc(i.value.replace("T", " "));
   if (i.type === "time") return esc(fmtHour(i.value));
+  if (i.type === "date") return esc(fmtDateJa(i.value));
   return esc(i.value);
 }
 
@@ -1082,30 +1107,24 @@ const itemsDl = (items) => {
 /* ---------- 完了報告フォーム ---------- */
 /* 1回の完了報告に複数の案件を入れられる（作成者が「＋ 別の案件を追加」で増やす）。
    保存時は案件ごとに1件の報告として登録する */
-let reportCases = [{ v: {}, na: {} }];
+let reportCases = [{ v: {} }];
 
 function syncCases() {
   const cards = document.querySelectorAll("#reportCases .case-card");
   if (!cards.length) return;
   reportCases = [...cards].map((c) => ({
-    v: toValues(collectItems(c.querySelector(".case-fields"), formats.report)),
-    na: toValues(collectItems(c.querySelector(".case-na"), formats.nextAction))
+    v: toValues(collectItems(c.querySelector(".case-fields"), formats.report))
   }));
 }
 
 function renderReportForm() {
-  if (!reportCases.length) reportCases = [{ v: {}, na: {} }];
+  if (!reportCases.length) reportCases = [{ v: {} }];
   const many = reportCases.length > 1;
-  const tag = naSectionRequired ? `<span class="req">必須</span>` : `<span class="opt">任意</span>`;
   $("#reportCases").innerHTML = reportCases.map((c, idx) => `
     <div class="case-card${many ? " multi" : ""}" data-case="${idx}">
       ${many ? `<div class="row-card-head"><span>案件 ${idx + 1}</span>
         <button class="btn small danger" type="button" data-remove-case="${idx}">この案件を削除</button></div>` : ""}
       <div class="case-fields">${fieldsHtml(formats.report, c.v)}</div>
-      <fieldset class="next-action">
-        <legend>次回アクション ${tag}</legend>
-        <div class="case-na">${fieldsHtml(formats.nextAction, c.na)}</div>
-      </fieldset>
     </div>`).join("");
   $("#addCase").classList.toggle("hidden", !!editingId);
   $("#caseHint").classList.toggle("hidden", !!editingId);
@@ -1114,7 +1133,7 @@ function renderReportForm() {
 
 $("#addCase").addEventListener("click", () => {
   syncCases();
-  reportCases.push({ v: {}, na: {} });
+  reportCases.push({ v: {} });
   renderReportForm();
   const cards = document.querySelectorAll("#reportCases .case-card");
   cards[cards.length - 1]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1130,7 +1149,7 @@ $("#reportCases").addEventListener("click", (e) => {
 
 function resetForm() {
   editingId = null;
-  reportCases = [{ v: {}, na: {} }];
+  reportCases = [{ v: {} }];
   $("#formTitle").textContent = "完了報告";
   $("#cancelEdit").classList.add("hidden");
   clearError($("#formError"));
@@ -1146,24 +1165,19 @@ $("#reportForm").addEventListener("submit", async (e) => {
 
   const cards = [...document.querySelectorAll("#reportCases .case-card")];
   let cases = cards.map((c) => ({
-    items: collectItems(c.querySelector(".case-fields"), formats.report),
-    nextActionItems: collectItems(c.querySelector(".case-na"), formats.nextAction)
+    items: collectItems(c.querySelector(".case-fields"), formats.report)
   }));
   const many = cases.length > 1;
   // 複数案件のとき、何も入力していない案件は保存しない
-  const isBlank = (c) => !c.items.some((i) => i.value) && !c.nextActionItems.some((i) => i.value);
+  const isBlank = (c) => !c.items.some((i) => i.value);
   const numbered = cases.map((c, i) => ({ ...c, no: i + 1 }));
   const targets = many ? numbered.filter((c) => !isBlank(c)) : numbered;
   if (!targets.length) { errEl.textContent = "案件を1件以上入力してください。"; return; }
 
   for (const c of targets) {
     const pre = many ? `案件${c.no}の` : "";
-    const naFilled = c.nextActionItems.some((i) => i.value);
-    // 次回アクションが「任意」で何も入力していなければ、次回アクションのチェックは省く
-    const err = validateItems(formats.report, c.items, pre) ||
-      ((naSectionRequired || naFilled) ? validateItems(formats.nextAction, c.nextActionItems, `${pre}次回アクションの`) : "");
+    const err = validateItems(formats.report, c.items, pre);
     if (err) { errEl.textContent = err; return; }
-    if (naSectionRequired && !naFilled) { errEl.textContent = `${pre}次回アクションを入力してください。`; return; }
   }
 
   $("#saveReport").disabled = true;
@@ -1171,18 +1185,19 @@ $("#reportForm").addEventListener("submit", async (e) => {
     if (editingId) {
       const c = targets[0];
       const prevR = reports.find((x) => x.id === editingId);
+      // 次回アクションは入力しなくなった。過去の報告に残っている次回アクションの値は、ここでは書き換えない
       await updateDoc(doc(db, "reports", editingId), {
-        items: c.items, nextActionItems: c.nextActionItems,
+        items: c.items,
         updatedAt: serverTimestamp(),
         updatedBy: currentUser.email
       });
-      if (prevR) historyUpdate("reports", prevR, ["items", "nextActionItems"], c, "報告の編集");
+      if (prevR) historyUpdate("reports", prevR, ["items"], c, "報告の編集");
       toast("更新しました");
     } else {
       const batch = writeBatch(db);
       targets.forEach((c) => {
         batch.set(doc(collection(db, "reports")), {
-          items: c.items, nextActionItems: c.nextActionItems,
+          items: c.items,
           authorUid: currentUser.uid,
           authorEmail: currentUser.email,
           createdAt: serverTimestamp(),
@@ -1217,7 +1232,7 @@ const toValues = (items) => Object.fromEntries((items || []).map((i) => [i.id, i
 
 function startEdit(r) {
   editingId = r.id;
-  reportCases = [{ v: toValues(r.items), na: toValues(naItemsOf(r)) }];
+  reportCases = [{ v: toValues(r.items) }];
   renderReportForm();
   $("#formTitle").textContent = "完了報告を編集";
   $("#cancelEdit").classList.remove("hidden");
@@ -1254,7 +1269,6 @@ const SORTERS = {
   new: (a, b) => tsNum(b.createdAt) - tsNum(a.createdAt),
   old: (a, b) => tsNum(a.createdAt) - tsNum(b.createdAt),
   received: (a, b) => byEmptyLast(firstOfType(b.items, ["datetime"]), firstOfType(a.items, ["datetime"])),
-  nextDate: (a, b) => byEmptyLast(firstOfType(naItemsOf(a), ["date", "datetime"]), firstOfType(naItemsOf(b), ["date", "datetime"])),
   caseName: (a, b) => byEmptyLast(reportTitle(a), reportTitle(b), true)
 };
 function byEmptyLast(x, y, ja = false) {
@@ -1298,11 +1312,11 @@ function renderList() {
   const byResult = {};
   list.forEach((r) => { const k = itemVal(r.items, "result") || "未入力"; byResult[k] = (byResult[k] || 0) + 1; });
   const won = byResult["成約"] || 0;
-  const rate = list.length ? Math.round((won / list.length) * 100) : 0;
+  const rate = pct(won, list.length); // 報告が1件以上あるので「—」にはならない
   const breakdown = Object.entries(byResult).filter(([k]) => k !== "成約").map(([k, c]) => `${esc(k)} ${c}件`).join("・");
   const who = authF === "me" ? "自分" : authF.startsWith("p:") ? `${authF.slice(2)}さん` : "";
   $("#listCount").innerHTML = `<span class="lc-total">${who ? `${esc(who)}：` : ""}${filtered ? `${list.length}件（全${reports.length}件中）` : `全${reports.length}件`}</span>` +
-    (list.length ? `<span class="lc-won">${ic("trophy")}成約 <b>${won}件</b>（成約率 ${rate}%）</span>` : "") +
+    (list.length ? `<span class="lc-won">${ic("trophy")}成約 <b>${won}件</b> ／ 報告 ${list.length}件 ＝ ${rate}%</span>` : "") +
     (breakdown ? `<span class="lc-rest">${breakdown}</span>` : "");
   $("#clearFilters").classList.toggle("hidden", !filtered && sort === "new");
 
@@ -1319,8 +1333,11 @@ function renderList() {
     const result = itemVal(r.items, "result");
     const caseNo = firstOfType(r.items, ["caseNo"]);
     // 1行目＝案件番号・場所、2行目＝数値（資金力・説明時間）と担当・受付
+    // 訪問日（訪問リストの日付。報告に入っていなければ案件番号から引く）。報告日時とは別に出す
+    const visitDay = itemVal(r.items, "visitDate") || visitOfReport(r)?.visitDate || "";
     const placeRow = [
       caseNo && `<span class="case-no">${esc(caseNo)}</span>`,
+      visitDay && `<span class="meta-item">${ic("calendar")}訪問 ${esc(dateShortJa(visitDay))}</span>`,
       (() => { const v = visitOfReport(r); const ad = v ? addressOf(v) : ""; return ad && `<span class="meta-item">${ic("home")}${esc(ad)}</span>`; })(),
       itemVal(r.items, "visitTo") && itemVal(r.items, "visitTo") !== title && `<span class="meta-item">${ic("pin")}${esc(itemVal(r.items, "visitTo"))}</span>`
     ].filter(Boolean);
@@ -1337,9 +1354,6 @@ function renderList() {
     // 店舗名の隣に業種（訪問リストの案件番号からたどる）
     const industry = (() => { const v = visitOfReport(r); return v ? industryOf(v) : ""; })();
 
-    // 次回アクションの枠は表示しない（データは報告に残す）。中身は「詳細を表示」の中で見られる
-    const na = naItemsOf(r);
-
     const actions = canModify(r) ? `
       <span class="btn-row" style="margin:0">
         <button class="btn small" type="button" data-edit="${esc(r.id)}">編集</button>
@@ -1348,7 +1362,9 @@ function renderList() {
 
     const demoUrl = itemVal(r.items, "demoUrl") || (() => { const v = visitOfReport(r); return v ? (v.demoUrl || itemVal(v.items, "demoUrl")) : ""; })();
     const demoHtml = demoUrl ? `<div class="btn-row">${demoLinksHtml(demoUrl)}</div>` : "";
-    const details = itemsDl(rest) + (na.some((i) => i.value) ? `<p class="details-sub">次回アクション</p>${itemsDl(na)}` : "");
+    // 詳細にも訪問日を出す（報告に入っていない古い報告は、訪問リストの日付を足す）
+    const visitItem = visitDay && !itemVal(r.items, "visitDate") ? [{ id: "visitDate", label: "訪問日", type: "date", value: visitDay }] : [];
+    const details = itemsDl([...visitItem, ...rest]);
 
     return `<article class="card report-card">
       <p class="report-by">報告者：<b>${esc(reporterName(r.authorEmail))}</b></p>
@@ -1363,7 +1379,7 @@ function renderList() {
       ${demoHtml}
       ${details ? `<details class="report-details"><summary>詳細を表示</summary>${details}</details>` : ""}
       <div class="report-foot">
-        <span>${esc(r.authorEmail)}・${fmtTs(r.createdAt)}</span>
+        <span>${esc(r.authorEmail)}・報告 ${fmtTs(r.createdAt)}</span>
         ${actions}
       </div>
     </article>`;
@@ -2023,12 +2039,6 @@ function renderVisitList() {
   $("#visitList").innerHTML = html;
 }
 
-$("#copyAllClaude").addEventListener("click", () => {
-  const urls = filteredVisits().flatMap((v) => (v.items || []).filter((i) => i.type === "maps" && i.value).map((i) => i.value));
-  if (!urls.length) { toast("GoogleマップのURLがありません"); return; }
-  copyText(urls.map(CLAUDE_TEMPLATE).join("\n"));
-});
-
 $("#visitList").addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-vedit], button[data-vdel]");
   if (!btn) return;
@@ -2064,12 +2074,7 @@ function renderFieldEditor() {
   if (!drafts[adminSection]) drafts[adminSection] = clone(formats[adminSection]);
   const fields = drafts[adminSection];
   $("#fmtHint").textContent = FORMATS[adminSection].hint;
-  $("#fmtSection").innerHTML = adminSection === "nextAction" ? `
-    <label class="check section-toggle">
-      <input type="checkbox" id="naRequiredToggle"${draftNaRequired ? " checked" : ""}>
-      完了報告で「次回アクション」の入力を必須にする
-    </label>
-    <p class="hint">オフにすると、次回アクションが空欄でも完了報告を保存できます。<br>入力した場合は、下の各項目の「必須」がチェックされます。</p>` : "";
+  $("#fmtSection").innerHTML = "";
 
   const typeOpts = (cur) => Object.entries(TYPE_LABELS)
     .map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${l}</option>`).join("");
@@ -2126,10 +2131,6 @@ $("#fieldEditor").addEventListener("click", (e) => {
   renderFieldEditor();
 });
 
-$("#fmtSection").addEventListener("change", (e) => {
-  if (e.target.id === "naRequiredToggle") draftNaRequired = e.target.checked;
-});
-
 $("#addField").addEventListener("click", () => {
   drafts[adminSection].push({ id: "f_" + Date.now().toString(36), label: "新しい項目", type: "text", required: false });
   renderFieldEditor();
@@ -2147,9 +2148,8 @@ $("#saveFormat").addEventListener("click", async () => {
       updatedAt: serverTimestamp(),
       updatedBy: currentUser.email
     };
-    if (adminSection === "nextAction") data.sectionRequired = draftNaRequired;
     if (adminSection === "visit") data.autoFieldsAdded = true;
-    if (adminSection === "report") { data.photoFieldAdded = true; data.wealthFieldAdded = true; data.explainTimeFieldAdded = true; }
+    if (adminSection === "report") { data.photoFieldAdded = true; data.wealthFieldAdded = true; data.explainTimeFieldAdded = true; data.visitDateFieldAdded = true; }
     await setDoc(doc(db, "settings", FORMATS[adminSection].doc), data);
     toast(`「${FORMATS[adminSection].title}」のフォーマットを保存しました`);
   } catch (err) {
@@ -2379,24 +2379,6 @@ function renderToday() {
       (route ? `<div class="btn-row"><a class="btn" href="${esc(route)}" target="_blank" rel="noopener">${ic("route")}この予定のルートをGoogleマップで開く</a></div>` : "")
     : `<p class="empty">${esc(dayWord)}の${esc(who)}訪問予定はありません${pF === "__me" && !myName ? "<br><small>右上の「名前を設定」で自分の名前を固定すると、自分の予定が表示されます</small>" : ""}${pF || iF || stF ? "<br><small>絞り込みを変えると、ほかの予定も見られます</small>" : ""}</p>`;
 
-  // 次回アクション：自分の報告で、予定日が今日まで・未対応のもの
-  const acts = reports.filter((r) => isMyReport(r) && !r.naDone).map((r) => {
-    const na = naItemsOf(r);
-    const d = firstOfType(na, ["date", "datetime"]).slice(0, 10);
-    return { r, d, text: firstOfType(na, ["textarea", "text"]), maps: firstOfType(na, ["maps"]) };
-  }).filter((x) => x.d && x.d <= t).sort((a, b) => a.d.localeCompare(b.d));
-  $("#todayActions").innerHTML = acts.length ? acts.map((x) => `
-    <div class="mini-row">
-      <div class="mini-main">
-        <div class="mini-title">${x.d < t ? '<span class="due over">期限切れ</span>' : '<span class="due now">今日</span>'} ${esc(reportTitle(x.r))}</div>
-        <div class="mini-sub">${esc(fmtDateJa(x.d))}${x.text ? ` · ${esc(x.text)}` : ""}</div>
-      </div>
-      <div class="btn-row" style="margin:0">
-        ${x.maps ? `<a class="btn small" href="${esc(x.maps)}" target="_blank" rel="noopener">地図</a>` : ""}
-        <button class="btn small primary" type="button" data-na-done="${esc(x.r.id)}">対応済みにする</button>
-      </div>
-    </div>`).join("") : `<p class="empty">期限が来ている次回アクションはありません</p>`;
-
   // 報告漏れ：自分の訪問で、訪問日が今日まで（直近14日）・未報告のもの
   const from = ymd(new Date(Date.now() - 14 * 864e5));
   const missing = visits.filter((v) => isMine(v) && v.visitDate && v.visitDate <= t && v.visitDate >= from && !visitStatus(v).done)
@@ -2405,18 +2387,6 @@ function renderToday() {
     ? `<p class="hint">直近2週間で、まだ完了報告をしていない訪問が ${missing.length}件あります</p>` + missing.map((v) => visitMiniHtml(v, { showDate: true })).join("")
     : `<p class="empty">${ic("checkCircle", "ok")}<br>報告漏れはありません</p>`;
 }
-document.addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-na-done]");
-  if (!b) return;
-  try {
-    const r = reports.find((x) => x.id === b.dataset.naDone);
-    const naAfter = { naDone: true, nextActionItems: naItemsOf(r) };
-    await updateDoc(doc(db, "reports", b.dataset.naDone), { ...naAfter, updatedAt: serverTimestamp() });
-    if (r) recordHistory({ label: "次回アクションの対応済み", col: "reports", id: r.id, before: { naDone: r.naDone === true, nextActionItems: clone(r.nextActionItems || []) }, after: clone(naAfter) });
-    toast("次回アクションを対応済みにしました");
-  } catch (err) { showBanner(err, "次回アクションの更新"); }
-});
-
 /* ---------- 同じ店舗の重複チェック ---------- */
 /* リンクの比べ方：共有用の付け足し（?g_st= など）や末尾の / の違いは同じリンクとみなす */
 function normMapsUrl(u) {
@@ -2662,6 +2632,12 @@ $("#statsYear").addEventListener("change", (e) => { statsAnchor = `${e.target.va
 $("#statsFrom").addEventListener("change", renderStats);
 $("#statsTo").addEventListener("change", renderStats);
 
+/* 成約率の決まり（集計・日報・日別推移・担当者別・地域別で同じ）：
+   成約率 ＝ 成約 ÷ 報告。訪問が0件、または報告が0件のときは「—」（100%や0%と出さない）。
+   表示は「75%」と、その下に「成約3 ／ 報告4」（分母が何か分かるように） */
+const rateOf = (won, reports, visits) => (visits > 0 && reports > 0 ? Math.round((won / reports) * 100) : null);
+const rateTxt = (won, reports, visits) => { const r = rateOf(won, reports, visits); return r === null ? "—" : `${r}%`; };
+const rateHtml = (won, reports, visits) => `<span class="st-rate"><b>${rateTxt(won, reports, visits)}</b><small>成約${won} ／ 報告${reports}</small></span>`;
 function statTable(rows, keyLabel) {
   if (!rows.length) return `<p class="empty">データがありません</p>`;
   const maxV = Math.max(1, ...rows.map((r) => r.visits));
@@ -2669,7 +2645,7 @@ function statTable(rows, keyLabel) {
     rows.map((r) => `<div class="st-row"><span class="st-key">${esc(r.key)}</span>
       <span class="st-vis"><i class="bar" style="width:${Math.round((r.visits / maxV) * 36)}px"></i>${r.visits}</span>
       <span>${r.reports}</span><span class="st-won">${r.won}</span>
-      <span>${r.reports ? Math.round((r.won / r.reports) * 100) : 0}%</span></div>`).join("") + "</div>";
+      ${rateHtml(r.won, r.reports, r.visits)}</div>`).join("") + "</div>";
 }
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
@@ -2683,7 +2659,6 @@ function dailyText(range, vs, rs) {
   const { results, cnt } = dailyNumbers(range.from, range.to, vs, rs);
   const c = cnt(rs);
   const won = c["成約"] || 0;
-  const pending = rs.filter((r) => !r.naDone && firstOfType(naItemsOf(r), ["date", "datetime"])).length;
   const people = {};
   const P = (n) => (people[n || "（担当者なし）"] ||= { v: 0, r: 0, w: 0 });
   vs.forEach((v) => P(personOf(v)).v++);
@@ -2692,10 +2667,10 @@ function dailyText(range, vs, rs) {
     `【日報】${range.text}`,
     `訪問予定：${vs.length}件`,
     `完了報告：${rs.length}件`,
-    `成約：${won}件（成約率 ${pct(won, rs.length)}%）`,
+    `成約：${won}件`,
+    `成約率：${rateTxt(won, rs.length, vs.length)}（成約${won}件 ／ 報告${rs.length}件）`,
     results.filter((k) => k !== "成約").map((k) => `${k}：${c[k] || 0}件`).join("　"),
     `報告漏れ（訪問−報告）：${Math.max(0, vs.length - rs.length)}件`,
-    `次回アクション（未対応）：${pending}件`,
     "",
     "■担当者別（訪問／報告／成約）",
     ...Object.entries(people).sort((a, b) => b[1].w - a[1].w || b[1].r - a[1].r).map(([n, x]) => `${n}：${x.v}／${x.r}／${x.w}`)
@@ -2774,7 +2749,7 @@ function renderStats() {
     return Object.values(m).sort((a, b) => b.won - a.won || b.reports - a.reports || b.visits - a.visits);
   };
   const totalWon = rs.filter(won).length;
-  $("#statsSummary").innerHTML = `<div><b>${vs.length}</b><small>訪問</small></div><div><b>${rs.length}</b><small>報告</small></div><div class="st-won"><b>${totalWon}</b><small>成約</small></div><div><b>${pct(totalWon, rs.length)}%</b><small>成約率</small></div>`;
+  $("#statsSummary").innerHTML = `<div><b>${vs.length}</b><small>訪問</small></div><div><b>${rs.length}</b><small>報告</small></div><div class="st-won"><b>${totalWon}</b><small>成約</small></div><div class="st-rate-box"><b>${rateTxt(totalWon, rs.length, vs.length)}</b><small>成約率（成約${totalWon} ／ 報告${rs.length}）</small></div>`;
 
   renderDaily(); // 日報（数字）は上の集計の期間とは別に、1週間ずつ表示する
 

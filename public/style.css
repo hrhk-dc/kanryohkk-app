@@ -82,7 +82,6 @@ a { color: var(--blue); }
   filter: drop-shadow(0 0 8px rgba(79, 139, 255, .45));
 }
 .topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.user-email { font-size: 12px; color: var(--muted); }
 
 main { max-width: 760px; margin: 0 auto; padding: 8px 16px 16px; }
 
@@ -418,9 +417,6 @@ body:not(.logged-in) .hidden-logged-out { display: none; }
 @media (max-width: 520px) {
   .sched-filters { grid-template-columns: 1fr 1fr; }
   .sched-filters label:last-child { grid-column: 1 / -1; }
-  #copyAppLink span, #logoutBtn span { display: none; }
-  #copyAppLink, #logoutBtn { width: 38px; height: 38px; padding: 0; }
-  #copyAppLink .ic, #logoutBtn .ic { margin: 0; }
 }
 @media (max-width: 480px) {
   .field-row-grid { grid-template-columns: 1fr; }
@@ -1502,6 +1498,115 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 }
 
 /* ================================================================
+   Round 13（v66）：右上の三本線メニュー
+   1. ヘッダーはロゴ＋「DC 完了報告」と、元に戻す・やり直す（インストールは出る時だけ）だけ。
+      リンクをコピー・名前を設定・メールアドレス・ログアウトはメニューの中へ移した（同じ ID・同じ動き）。
+      右側は三本線ボタンの分だけ空ける（.topbar の右余白）。
+   2. 三本線ボタン（.menu-btn）：position: fixed で右上に固定。上のバーが隠れても出たまま。
+      直径44px。押せるので黒（--scrim に近い #0B0D12 の86%）＋縁。縁は虹色を55%に薄めた --ring（目立ちすぎない）。
+      開いている間だけ縁を全量の虹色にし、アイコンは「閉じる」の×に変わる。
+   3. メニュー（.menu-panel）：ガラスの面（白の透明度）＋細い虹色の縁、角丸24px。
+      項目（.menu-item）は押せるので完全なピル＋黒＋虹色の縁。選ばれているタブは --k-sel の薄い面＋白文字（Round 9 の切り替えと同じ）。
+      区切り線は --line。メールアドレスは押せない表示だけの文字（ピルなし）。
+   4. 開いている間は幕（.menu-scrim）で後ろを覆い、ヘッダーと本体（main）は inert（触れない・フォーカスもできない）。
+      閉じ方：項目をタップ／幕をタップ／Esc／三本線（×）をタップ。
+   5. 動き：200ms のフェードと 8px の下りる動き。動きを減らす設定では止める。
+   6. 表示の条件：ログイン中だけ（body:not(.logged-in) で隠れる）。集計・管理はメニューでも管理者だけ（下のタブと同じ条件）。
+      承認待ちの人はタブの項目を出さない（メニューの中身はリンク・名前・ログアウト・メール）。
+   ================================================================ */
+.topbar { padding-right: max(64px, calc((100% - 724px) / 2)); }
+
+.menu-btn {
+  position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 75;
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; margin: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid transparent; border-radius: 999px;
+  background: linear-gradient(rgba(11, 13, 18, .86), rgba(11, 13, 18, .86)) padding-box, var(--ring) border-box;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .8);
+  color: var(--text);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease), box-shadow .15s, background .2s;
+}
+.menu-btn .ic { width: 20px; height: 20px; margin: 0; color: var(--sub); stroke-width: 1.5; }
+.menu-btn[aria-expanded="true"] {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box;
+}
+.menu-btn[aria-expanded="true"] .ic { color: var(--text); }
+.menu-btn:active { transform: scale(.94); }
+
+.menu-layer {
+  position: fixed; inset: 0; z-index: 70;
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity .2s ease-out, visibility 0s linear .2s;
+}
+.menu-layer.open { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease-out; }
+.menu-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); touch-action: none; }
+.menu-panel {
+  position: absolute; top: calc(64px + env(safe-area-inset-top)); right: 12px;
+  width: min(292px, calc(100vw - 24px)); max-height: calc(100vh - 80px); max-height: calc(100dvh - 80px);
+  overflow-y: auto; padding: 12px;
+  border: 1.5px solid transparent; border-radius: 24px;
+  background: linear-gradient(var(--card-hi), var(--card)) padding-box, linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--ring) border-box;
+  box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity .2s ease-out, transform .2s var(--ease);
+}
+.menu-layer.open .menu-panel { opacity: 1; transform: none; }
+body.menu-open { overflow: hidden; }
+
+.menu-group { display: flex; flex-direction: column; gap: 8px; }
+.menu-sep { height: 1px; background: var(--line); margin: 12px 8px; }
+.menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 46px; padding: 0 18px; margin: 0;
+  border: 1.5px solid transparent; border-radius: 999px;
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box;
+  box-shadow: var(--k-lift);
+  color: var(--text); font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease), box-shadow .15s;
+}
+.menu-item .ic { width: 18px; height: 18px; margin: 0; flex: none; color: var(--sub); stroke-width: 1.5; }
+.menu-item span { min-width: 0; }
+.menu-item:active { transform: translateY(2px) scale(.97); box-shadow: var(--k-press); }
+.menu-item.current {
+  background: linear-gradient(var(--k-sel), var(--k-sel)) padding-box, var(--k-ring) border-box;
+  color: #fff;
+  box-shadow: 0 0 14px -4px rgba(0, 229, 255, .45), 0 0 16px -6px rgba(255, 46, 136, .4);
+}
+.menu-item.current .ic { color: #7dd3ff; }
+.menu-email { margin: 12px 8px 4px; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-layer, .menu-panel, .menu-item, .menu-btn { transition: none !important; }
+}
+
+/* ================================================================
+   Round 14（v67）
+   1. 「このアプリについて」（.about）：短い文・見出し付き。390pxで読みやすい行間と字の大きさ（本文16px）。
+      押せるボタンは置かない（表示だけのページ）。
+   2. 成約率の表示（.st-rate）：「75%」の下に「成約3 ／ 報告4」を小さく出し、分母を見せる。
+   3. 成約率の注記（.rate-note）は補助の文字（13px・--muted）。
+   ================================================================ */
+.about { line-height: 1.75; }
+.about h2 { margin-bottom: 6px; }
+.about h3 { font-size: 16px; font-weight: 700; margin: 22px 0 8px; color: var(--text); }
+.about-lead { font-size: 16px; color: var(--sub); margin: 4px 0 0; }
+.about ul, .about ol { margin: 0; padding-left: 1.3em; color: var(--sub); }
+.about li { margin: 0 0 8px; }
+.about li b { color: var(--text); }
+.about-list { margin: 0; }
+.about-list dt { font-weight: 700; color: var(--text); margin-top: 12px; }
+.about-list dt:first-child { margin-top: 0; }
+.about-list dd { margin: 2px 0 0; color: var(--sub); }
+.about .hint { margin-top: 18px; font-size: 13px; color: var(--muted); }
+.rate-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.st-rate { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+.st-rate b { font-weight: 700; }
+.st-rate small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.st-rate-box small { white-space: normal; }
+
+/* ================================================================
    Round 13（v66）：390px の読みやすさ修正（見た目だけ。データ・機能・権限は変えない）
    1. 報告カードの数値メタ行（資金力・説明・必要性・担当・受付）：項目は切らず、項目の単位で折り返す。
       1項目＝1つのグレーのピル（縮めない・隠さない）。Round 7 の「2行にしない」は、5項目が
@@ -1531,3 +1636,4 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 }
 
 .btn { word-break: keep-all; }
+>
