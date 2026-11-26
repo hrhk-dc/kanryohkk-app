@@ -1575,6 +1575,8 @@ body.menu-open { overflow: hidden; }
   box-shadow: 0 0 14px -4px rgba(0, 229, 255, .45), 0 0 16px -6px rgba(255, 46, 136, .4);
 }
 .menu-item.current .ic { color: #7dd3ff; }
+/* 外のアプリへのリンク（マップリストアプリ）も、他の項目と同じ見た目にする（下線なし） */
+a.menu-item { text-decoration: none; }
 .menu-email { margin: 12px 8px 4px; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) {
