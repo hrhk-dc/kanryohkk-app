@@ -1632,6 +1632,56 @@ a.menu-item { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .maplist-btn { transition: none !important; } }
 
 /* ================================================================
+   Round 16（v70）：アプリの切り替え（完了報告 ⇄ マップリスト）。同じ画面の中で切り替える
+   1. ヘッダー右：2択のピル（完了報告／Maplist）。メンバーがログインしているときだけ出す（body.member）。
+      選ばれている方＝純黒の中＋虹色の縁（Round 9 の切り替えと同じ）＋白文字・太字。
+      選ばれていない方＝グレー（--k-grey）の平らなピル。影・縁なし。
+   2. 左のタイトル：今のアプリ名（DC 完了報告／マップリスト）。ロゴも切り替える（DCロゴ／マップリストのアイコン）。
+   3. マップリストの画面（.ml-host）は、切り替えたときだけ表示する（body.mode-ml）。完了報告の画面（#appView）は隠す。
+   4. 三本線メニュー：マップリストのときは、完了報告の6タブ・元に戻す／やり直す・外のリンクを隠し、
+      「訪問NG一覧」「お気に入り条件」を出す（.ml-only）。
+   ================================================================ */
+.app-switch { display: none; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .45); }
+body.member .app-switch { display: inline-flex; }
+.app-seg {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; margin: 0;
+  border: 2px solid transparent; border-radius: 999px;
+  background: var(--k-grey); color: var(--sub);
+  font: inherit; font-size: 12px; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .2s, color .2s, box-shadow .2s;
+}
+.app-seg[aria-selected="true"] {
+  background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box;
+  color: #fff;
+  box-shadow: 0 0 12px -4px rgba(0, 229, 255, .45), 0 0 14px -6px rgba(255, 46, 136, .4);
+}
+.app-seg:active { transform: scale(.96); }
+.app-seg-ic { width: 18px; height: 18px; border-radius: 5px; flex: none; display: block; }
+#appName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* マップリストのとき：完了報告の画面は隠し、マップリストを出す */
+.ml-host { display: none; }
+body.mode-ml .ml-host { display: block; }
+body.mode-ml #appView, body.mode-ml #authView, body.mode-ml #pendingView { display: none !important; }
+body.mode-ml #namePanel { display: none !important; }
+body.mode-ml #menuTabs, body.mode-ml #menuHistory, body.mode-ml a.menu-item { display: none !important; }
+.ml-only { display: none; }
+body.mode-ml .ml-only { display: flex; }
+/* ヘッダーは390pxでも1行に収める（タイトルは縮め、切り替えは小さく。右端は三本線ボタンの分を空ける） */
+@media (max-width: 480px) {
+  .topbar { flex-wrap: nowrap; gap: 6px; }
+  .app-title { flex: 1 1 auto; min-width: 0; }
+  .topbar-actions { flex: 0 0 auto; }
+  .topbar .brand-mark { width: 28px; height: 28px; }
+  .topbar h1 { gap: 7px; font-size: 16px; }
+  #appName { font-size: 15px; }
+  .app-switch { padding: 2px; }
+  .app-seg { height: 30px; padding: 0 7px; gap: 3px; font-size: 11.5px; border-width: 1.5px; }
+  .app-seg-ic { width: 16px; height: 16px; border-radius: 4px; }
+}
+
+/* ================================================================
    Round 13（v66）：390px の読みやすさ修正（見た目だけ。データ・機能・権限は変えない）
    1. 報告カードの数値メタ行（資金力・説明・必要性・担当・受付）：項目は切らず、項目の単位で折り返す。
       1項目＝1つのグレーのピル（縮めない・隠さない）。Round 7 の「2行にしない」は、5項目が

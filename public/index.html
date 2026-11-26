@@ -20,10 +20,13 @@
 </head>
 <body>
 <header class="topbar">
-  <h1><svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="bmD" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--holo-cyan)"/><stop offset=".55" stop-color="var(--holo-blue)"/><stop offset="1" stop-color="var(--holo-violet)"/></linearGradient><linearGradient id="bmC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--holo-sky)"/><stop offset=".5" stop-color="var(--holo-lilac)"/><stop offset="1" stop-color="var(--holo-pink)"/></linearGradient><linearGradient id="bmO" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--holo-cyan)"/><stop offset="1" stop-color="var(--holo-pink)"/></linearGradient><radialGradient id="bmS"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="64" height="64" rx="18" fill="var(--bg)"/><rect x=".75" y=".75" width="62.5" height="62.5" rx="17.3" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.5"/><ellipse cx="32" cy="33" rx="27" ry="12.5" transform="rotate(-24 32 33)" fill="none" stroke="url(#bmO)" stroke-width="1.6"/><path d="M15 17H26C35 17 40.5 23 40.5 31.5S35 46 26 46H15Z" fill="none" stroke="url(#bmD)" stroke-width="5.6" stroke-linejoin="miter"/><path d="M51 23C47 17.5 40 17.5 36.5 21.5C32 26.5 32.5 36 37.5 41C42 45.5 49 45 52.5 40.5" fill="none" stroke="url(#bmC)" stroke-width="5.6"/><circle cx="24" cy="47" r="7" fill="url(#bmS)"/><path d="M24 40.5L25.2 45.8L30.5 47L25.2 48.2L24 53.5L22.8 48.2L17.5 47L22.8 45.8Z" fill="#fff"/></svg>DC 完了報告</h1>
+  <h1 class="app-title"><svg id="appLogo" class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="bmD" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--holo-cyan)"/><stop offset=".55" stop-color="var(--holo-blue)"/><stop offset="1" stop-color="var(--holo-violet)"/></linearGradient><linearGradient id="bmC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--holo-sky)"/><stop offset=".5" stop-color="var(--holo-lilac)"/><stop offset="1" stop-color="var(--holo-pink)"/></linearGradient><linearGradient id="bmO" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--holo-cyan)"/><stop offset="1" stop-color="var(--holo-pink)"/></linearGradient><radialGradient id="bmS"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="64" height="64" rx="18" fill="var(--bg)"/><rect x=".75" y=".75" width="62.5" height="62.5" rx="17.3" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.5"/><ellipse cx="32" cy="33" rx="27" ry="12.5" transform="rotate(-24 32 33)" fill="none" stroke="url(#bmO)" stroke-width="1.6"/><path d="M15 17H26C35 17 40.5 23 40.5 31.5S35 46 26 46H15Z" fill="none" stroke="url(#bmD)" stroke-width="5.6" stroke-linejoin="miter"/><path d="M51 23C47 17.5 40 17.5 36.5 21.5C32 26.5 32.5 36 37.5 41C42 45.5 49 45 52.5 40.5" fill="none" stroke="url(#bmC)" stroke-width="5.6"/><circle cx="24" cy="47" r="7" fill="url(#bmS)"/><path d="M24 40.5L25.2 45.8L30.5 47L25.2 48.2L24 53.5L22.8 48.2L17.5 47L22.8 45.8Z" fill="#fff"/></svg><img id="appLogoMl" class="brand-mark hidden" src="/icons/maplist-icon.png" alt="" width="34" height="34"><span id="appName">DC 完了報告</span></h1>
   <div class="topbar-actions">
-    <button id="undoBtn" class="btn ghost small icon-btn hidden-logged-out" type="button" disabled title="直前の削除・変更を元に戻す" aria-label="元に戻す"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5L4.5 10.5l4 4"/><path d="M4.5 10.5h10a5 5 0 010 10H11"/></svg></button>
-    <button id="redoBtn" class="btn ghost small icon-btn hidden-logged-out" type="button" disabled title="元に戻した操作をやり直す" aria-label="やり直す"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 6.5l4 4-4 4"/><path d="M19.5 10.5h-10a5 5 0 000 10H13"/></svg></button>
+    <!-- アプリの切り替え（完了報告 ⇄ マップリスト）。メンバーがログインしているときだけ出す -->
+    <div class="app-switch hidden-logged-out" role="tablist" aria-label="アプリの切り替え">
+      <button type="button" role="tab" class="app-seg on" data-app="dc" aria-selected="true"><img class="app-seg-ic" src="/icons/icon-192.png" alt="" width="18" height="18"><span>完了報告</span></button>
+      <button type="button" role="tab" class="app-seg" data-app="ml" aria-selected="false"><img class="app-seg-ic" src="/icons/maplist-icon.png" alt="" width="18" height="18"><span>Maplist</span></button>
+    </div>
     <button id="installBtn" class="btn primary small hidden" type="button">アプリをインストール</button>
   </div>
 </header>
@@ -42,7 +45,15 @@
       <button id="menuAdminTab" class="menu-item hidden" type="button" data-menu-tab="admin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg><span>管理</span></button>
       <button class="menu-item" type="button" data-menu-tab="about"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.01"/></svg><span>このアプリについて</span></button>
     </div>
+    <div class="menu-group ml-only" id="menuMl">
+      <button class="menu-item" type="button" data-ml-act="block"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/></svg><span>訪問NG一覧</span></button>
+      <button class="menu-item" type="button" data-ml-act="presets"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg><span>お気に入り条件</span></button>
+    </div>
     <div class="menu-sep" role="separator"></div>
+    <div class="menu-group" id="menuHistory">
+      <button id="undoBtn" class="menu-item hidden-logged-out" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5L4.5 10.5l4 4"/><path d="M4.5 10.5h10a5 5 0 010 10H11"/></svg><span>元に戻す</span></button>
+      <button id="redoBtn" class="menu-item hidden-logged-out" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 6.5l4 4-4 4"/><path d="M19.5 10.5h-10a5 5 0 000 10H13"/></svg><span>やり直す</span></button>
+    </div>
     <div class="menu-group">
       <a class="menu-item" href="https://maplist-app.pages.dev/" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.5L3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z"/><path d="M9 4.5v13M15 6.5v13"/></svg><span>マップリストアプリ</span></a>
       <button id="copyAppLink" class="menu-item" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg><span>リンクをコピー</span></button>
@@ -433,7 +444,97 @@
       </div>
     </div>
   </section>
+
+  <!-- マップリスト（完了報告の中に組み込む。表示するのは切り替えたときだけ。中身は下の template から作る） -->
+  <div id="mlHost" class="ml-host"></div>
 </main>
+
+<template id="mlTpl">
+  <div class="ml-app">
+
+    <!-- 検索 -->
+    <section class="screen" data-screen="search" aria-label="検索">
+      <header class="hero">
+        <h1>マップリスト</h1>
+        <p class="lead">ウェブサイトが載っていない店だけを、営業しやすさまで見ておすすめ順に並べます。（チェーン店は除外）</p>
+        <p class="demo-note" id="demoNote" hidden>表示中はサンプルデータです（API未接続）</p>
+      </header>
+
+      <div class="card account" id="account"></div>
+      <div class="card"><h2 class="sec">エリア</h2><div id="s-area"></div></div>
+      <div class="card"><h2 class="sec">半径</h2><div id="s-radius"></div></div>
+      <div class="card">
+        <div class="row-between"><h2 class="sec">件数</h2><div id="s-count"></div></div>
+      </div>
+      <div class="card"><h2 class="sec">訪問する日</h2><div id="s-date"></div></div>
+      <div class="card">
+        <div class="row-between sec-row"><h2 class="sec">業種</h2><button class="pill-btn" id="allInd" data-act="ind-all">全て</button></div>
+        <div id="s-ind"></div>
+      </div>
+      <div class="card" id="presetCard"><h2 class="sec">お気に入り条件</h2><div id="s-presets"></div></div>
+
+      <div class="dock"><button class="btn primary wide" data-act="run-search">提案リストを作る</button></div>
+    </section>
+
+    <!-- 提案リスト -->
+    <section class="screen" data-screen="proposal" aria-label="提案リスト">
+      <header class="page-head">
+        <h1>提案リスト</h1>
+        <p class="summary" id="pSummary"></p>
+      </header>
+      <div class="seg" id="pSort" role="tablist"></div>
+      <div class="seg two view-seg" id="pView" role="tablist"></div>
+      <div class="card"><h2 class="sec">業種で絞り込み</h2><div class="chips" id="pInd"></div></div>
+      <div class="card row-between">
+        <span id="pOpenLabel"></span>
+        <button class="switch" id="pOpen" role="switch" data-act="open-only" aria-checked="true"></button>
+      </div>
+      <div class="list-head">
+        <h2>提案リスト</h2>
+        <p class="sub">サイトなし・チェーン店除外済み</p>
+      </div>
+      <div id="pList"></div>
+      <div class="dock two">
+        <button class="btn" data-act="go-search">条件を変えてもう一度</button>
+        <button class="btn primary" data-act="go-list">訪問リストを見る</button>
+      </div>
+    </section>
+
+    <!-- 訪問リスト（完了報告アプリの訪問リストと同じもの） -->
+    <section class="screen" data-screen="list" aria-label="訪問リスト">
+      <header class="page-head">
+        <h1>訪問リスト</h1>
+        <div class="head-actions">
+          <button class="btn small" data-act="copy-all" data-src="visit">全部のリンクをコピー</button>
+          <button class="btn small" data-act="go-dc">完了報告へ</button>
+        </div>
+      </header>
+      <div class="row-between list-tools">
+        <span class="sub" id="lCount"></span>
+        <button class="btn small" data-act="sort-dist">近い順に並べ替え</button>
+      </div>
+      <div id="lList"></div>
+    </section>
+
+    <!-- 後で訪問 -->
+    <section class="screen" data-screen="later" aria-label="後で訪問">
+      <header class="page-head">
+        <h1>後で訪問</h1>
+        <div class="head-actions">
+          <button class="btn small" data-act="copy-all" data-src="later">全部のリンクをコピー</button>
+        </div>
+      </header>
+      <div class="row-between list-tools"><span class="sub" id="gCount"></span></div>
+      <div id="gList"></div>
+    </section>
+
+  </div>
+
+  <nav class="tabs" id="nav" aria-label="マップリストのメニュー"></nav>
+  <div id="sheet" class="sheet-root" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</template>
+
 
 <div id="toast" class="toast"></div>
 

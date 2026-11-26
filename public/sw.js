@@ -1,10 +1,13 @@
 // DC 完了報告：ホーム画面アプリ用のサービスワーカー
 // 画面のファイルは「ネット優先・つながらない時だけ保存版」を使う（更新がすぐ反映されるように）
 // 報告データ（Firebase）は保存しない
-const CACHE = "dc-report-v69";
+const CACHE = "dc-report-v70";
+// 完了報告とマップリストは、このサービスワーカー1つで扱う（マップリストの sw.js は使わない）
 const SHELL = [
   "/", "/index.html", "/style.css", "/app.js", "/firebase-config.js",
-  "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/icons/apple-touch-icon.png"
+  "/maplist/app.js", "/maplist/data.js", "/maplist/style.css",
+  "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/icons/apple-touch-icon.png",
+  "/icons/maplist-icon.png"
 ];
 
 self.addEventListener("install", (e) => {
