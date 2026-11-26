@@ -718,7 +718,6 @@ label { color: var(--sub); }
 .topbar-actions .btn.ghost:hover { background: var(--tile-hi); }
 .topbar-actions .btn:disabled { opacity: .35; }
 .topbar-actions .btn:disabled:hover { filter: none; transform: none; }
-#undoBtn, #redoBtn { width: 40px; height: 40px; min-height: 40px; }
 #installBtn { background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--ring) border-box; border: 1.5px solid transparent; color: var(--text); box-shadow: none; }
 
 /* ボタン：角丸16px。メインは薄いグラデーションの枠（白地は使わない） */
@@ -1665,7 +1664,7 @@ body.member .app-switch { display: inline-flex; }
 body.mode-ml .ml-host { display: block; }
 body.mode-ml #appView, body.mode-ml #authView, body.mode-ml #pendingView { display: none !important; }
 body.mode-ml #namePanel { display: none !important; }
-body.mode-ml #menuTabs, body.mode-ml #menuHistory, body.mode-ml a.menu-item { display: none !important; }
+body.mode-ml #histBar { display: none !important; }
 .ml-only { display: none; }
 body.mode-ml .ml-only { display: flex; }
 /* ヘッダーは390pxでも1行に収める（タイトルは縮め、切り替えは小さく。右端は三本線ボタンの分を空ける） */
@@ -1680,6 +1679,27 @@ body.mode-ml .ml-only { display: flex; }
   .app-seg { height: 30px; padding: 0 7px; gap: 3px; font-size: 11.5px; border-width: 1.5px; }
   .app-seg-ic { width: 16px; height: 16px; border-radius: 4px; }
 }
+
+/* ================================================================
+   Round 21（v76）：元に戻す・やり直すは、タイトルの下（ヘッダーの中の2段目）に並べる。
+   ヘッダーと一緒に隠れ、一緒に出る（.topbar.hide は中身ごと隠す）。完了報告のときだけ出す。
+   文字は横一列のまま（折り返さない）。三本線メニューからは外した。
+   ================================================================ */
+.topbar { flex-wrap: wrap; }
+.hist-bar { flex: 0 0 100%; order: 2; display: flex; flex-wrap: nowrap; gap: 8px; margin-top: 8px; }
+.hist-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: var(--tile); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--glass-line);
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease), background .2s;
+}
+.hist-btn .ic { width: 16px; height: 16px; margin: 0; flex: none; color: var(--sub); stroke-width: 1.5; }
+.hist-btn:hover { background: var(--tile-hi); }
+.hist-btn:active { transform: scale(.96); }
+.hist-btn:disabled { opacity: .35; cursor: default; }
+.hist-btn:disabled:hover { background: var(--tile); }
 
 /* 下のタブ：完了報告の棒を、マップリストでも使う（同じ見た目・同じ動き）。モードで中身だけ替える */
 body:not(.mode-ml) .ml-tab { display: none !important; }
