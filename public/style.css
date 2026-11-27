@@ -162,7 +162,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--violet); }
   background: rgba(24, 24, 27, .88); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid var(--line); border-radius: 28px;
   box-shadow: 0 10px 32px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .4);
-  transition: transform .45s ease-out, opacity .45s ease-out;
+  transition: transform .68s ease-out, opacity .68s ease-out;
   will-change: transform, opacity;
 }
 /* 下にスクロールしたら隠れ、上にスクロールしたら出る（ゆっくり・なめらかにフェード。隠れている間は触れない） */
@@ -619,7 +619,7 @@ input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-da
 #schedDate, #visitDate, #visitFilterDate { max-width: 100%; }
 
 /* 上のバー：下にスクロールしたら隠れ、一番上に戻ったときだけ出る */
-.topbar { transition: transform .45s ease-out, opacity .45s ease-out; }
+.topbar { transition: transform .68s ease-out, opacity .68s ease-out; }
 .topbar.hide { transform: translateY(-12px); opacity: 0; pointer-events: none; }
 
 /* 集計の日報（数字）：表だけ横にスクロールできる。日付の列は左に固定 */
@@ -1641,7 +1641,7 @@ a.menu-item { text-decoration: none; }
    2. 左のタイトル：今のアプリ名（DC 完了報告／マップリスト）。ロゴも切り替える（DCロゴ／マップリストのアイコン）。
    3. マップリストの画面（.ml-host）は、切り替えたときだけ表示する（body.mode-ml）。完了報告の画面（#appView）は隠す。
    4. 三本線メニュー：マップリストのときは、完了報告の6タブ・元に戻す／やり直す・外のリンクを隠し、
-      「訪問NG一覧」「お気に入り条件」を出す（.ml-only）。
+      「訪問NG一覧」を出す（.ml-only）。
    ================================================================ */
 .app-switch { display: none; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .45); }
 body.member .app-switch { display: inline-flex; }
@@ -1711,7 +1711,7 @@ body.mode-ml .dc-only-menu { display: none !important; }
 .ml-sort-wrap {
   display: none; position: sticky; top: 60px; z-index: 26; padding: 8px 16px;
   background: var(--scrim); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
-  border-bottom: 1px solid var(--line); transition: top .45s ease-out;
+  border-bottom: 1px solid var(--line); transition: top .68s ease-out;
 }
 body.mode-ml.ml-proposal .ml-sort-wrap { display: block; }
 .topbar.hide + .ml-sort-wrap { top: 0; }

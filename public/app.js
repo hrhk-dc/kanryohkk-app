@@ -3194,13 +3194,12 @@ document.querySelectorAll("[data-app-go]").forEach((b) => {
 document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
   b.addEventListener("click", () => window.dcSwitchApp(b.dataset.app));
 });
-// 三本線メニューの「訪問NG一覧」「お気に入り条件」（マップリストの機能）
+// 三本線メニューの「訪問NG一覧」（マップリストの機能）
 document.querySelectorAll("[data-ml-act]").forEach((b) => {
   b.addEventListener("click", () => {
     setMenu(false);
     if (!window.mlActions) return;
     if (b.dataset.mlAct === "block") window.mlActions.blockList();
-    else window.mlActions.presets();
   });
 });
 
