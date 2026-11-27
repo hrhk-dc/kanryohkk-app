@@ -377,6 +377,11 @@ body:not(.logged-in) .hidden-logged-out { display: none; }
 .stat-table.daily .st-head, .stat-table.daily .st-row { grid-template-columns: 1.6fr repeat(var(--cols, 5), minmax(34px, 1fr)); }
 .stat-table.daily .st-head span, .stat-table.daily .st-row span { text-align: center; }
 .stat-table.daily .st-head span:first-child, .stat-table.daily .st-row span:first-child { text-align: left; }
+/* 担当者別：数字の列はすべて右そろえ（見出しと、下の店の行の数字の右端を同じ線にそろえる）。成約率はパーセントだけ */
+.stat-table.person .st-head span:not(:first-child), .stat-table.person .st-row > span:not(:first-child) { text-align: right; justify-self: end; }
+.stat-table.person .st-row .st-vis { display: flex; justify-content: flex-end; align-items: center; gap: 0; }
+.stat-table.person .st-row .st-rate { width: 100%; align-items: flex-end; justify-self: stretch; }
+.stat-table.person .st-rate b { font-variant-numeric: tabular-nums; }
 
 /* エラー表示 */
 .error-box { background: rgba(255, 90, 95, .10); border: 1px solid rgba(255, 90, 95, .3); border-radius: 16px; padding: 12px 14px; color: var(--text); font-size: 14px; line-height: 1.6; }

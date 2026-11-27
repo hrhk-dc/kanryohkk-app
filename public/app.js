@@ -2759,14 +2759,16 @@ $("#statsTo").addEventListener("change", renderStats);
 const rateOf = (won, reports, visits) => (visits > 0 && reports > 0 ? Math.round((won / reports) * 100) : null);
 const rateTxt = (won, reports, visits) => { const r = rateOf(won, reports, visits); return r === null ? "—" : `${r}%`; };
 const rateHtml = (won, reports, visits) => `<span class="st-rate"><b>${rateTxt(won, reports, visits)}</b><small>成約${won} ／ 報告${reports}</small></span>`;
-function statTable(rows, keyLabel) {
+// 担当者別は、パーセントだけ（件数の行は出さない）
+const rateOnlyHtml = (won, reports, visits) => `<span class="st-rate"><b>${rateTxt(won, reports, visits)}</b></span>`;
+function statTable(rows, keyLabel, pctOnly = false) {
   if (!rows.length) return `<p class="empty">データがありません</p>`;
   const maxV = Math.max(1, ...rows.map((r) => r.visits));
-  return `<div class="stat-table"><div class="st-head"><span>${keyLabel}</span><span>訪問</span><span>報告</span><span>成約</span><span>成約率</span></div>` +
+  return `<div class="stat-table${pctOnly ? " person" : ""}"><div class="st-head"><span>${keyLabel}</span><span>訪問</span><span>報告</span><span>成約</span><span>成約率</span></div>` +
     rows.map((r) => `<div class="st-row"><span class="st-key">${esc(r.key)}</span>
       <span class="st-vis"><i class="bar" style="width:${Math.round((r.visits / maxV) * 36)}px"></i>${r.visits}</span>
       <span>${r.reports}</span><span class="st-won">${r.won}</span>
-      ${rateHtml(r.won, r.reports, r.visits)}</div>`).join("") + "</div>";
+      ${pctOnly ? rateOnlyHtml(r.won, r.reports, r.visits) : rateHtml(r.won, r.reports, r.visits)}</div>`).join("") + "</div>";
 }
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
@@ -2874,7 +2876,7 @@ function renderStats() {
 
   renderDaily(); // 日報（数字）は上の集計の期間とは別に、1週間ずつ表示する
 
-  $("#statsPerson").innerHTML = statTable(group(personOf, reportPerson), "担当者");
+  $("#statsPerson").innerHTML = statTable(group(personOf, reportPerson), "担当者", true);
   const reportPlace = (r) => {
     const v = visitOfReport(r);
     if (!v) return "";
