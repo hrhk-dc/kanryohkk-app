@@ -1019,12 +1019,23 @@ function menuPosApply() {
   const v = menuPosLoad();
   const s = menuBtn.style;
   s.top = ""; s.bottom = ""; s.left = ""; s.right = "";
+  // ヘッダーの右端にボタンがあるときだけ、右の空き（切り替えの右）を取る。端へ動かしたら空けない（切り替えは右端へ寄る）
+  const f0 = v ? Math.min(Math.max(v.pos, 0), 1) : 0;
+  const inHead = !v
+    || (v.edge === "right" && MENU_EDGE_M + f0 * (innerHeight - MENU_SIZE - 2 * MENU_EDGE_M) < 72)
+    || (v.edge === "top" && MENU_EDGE_M + f0 * (innerWidth - MENU_SIZE - 2 * MENU_EDGE_M) > innerWidth / 2);
+  document.body.classList.toggle("menu-in-header", inHead);
+  document.documentElement.style.setProperty("--menu-gutter", "64px"); // 右の端にあるボタンの分（ボタン＋すき間）
   if (!v) return;
   const f = Math.min(Math.max(v.pos, 0), 1);
   const alongX = Math.round(MENU_EDGE_M + f * (innerWidth - MENU_SIZE - 2 * MENU_EDGE_M));
   const alongY = Math.round(MENU_EDGE_M + f * (innerHeight - MENU_SIZE - 2 * MENU_EDGE_M));
   // 使わない辺も必ず auto にする（スタイルシートの既定の top・right が残ると、端に置けない）
-  if (v.edge === "top") { s.top = `calc(${MENU_EDGE_M}px + env(safe-area-inset-top))`; s.bottom = "auto"; s.left = `${alongX}px`; s.right = "auto"; }
+  if (v.edge === "top") {
+    s.top = `calc(${MENU_EDGE_M}px + env(safe-area-inset-top))`; s.bottom = "auto"; s.left = `${alongX}px`; s.right = "auto";
+    // 上の端にあるボタンの左端まで、右の空きを取る（ボタンの下に切り替えが重ならないように）
+    document.documentElement.style.setProperty("--menu-gutter", `${Math.max(64, innerWidth - alongX + MENU_EDGE_M)}px`);
+  }
   else if (v.edge === "bottom") { s.bottom = `calc(${MENU_EDGE_M}px + env(safe-area-inset-bottom))`; s.top = "auto"; s.left = `${alongX}px`; s.right = "auto"; }
   else if (v.edge === "left") { s.left = `${MENU_EDGE_M}px`; s.right = "auto"; s.top = `${alongY}px`; s.bottom = "auto"; }
   else { s.right = `${MENU_EDGE_M}px`; s.left = "auto"; s.top = `${alongY}px`; s.bottom = "auto"; }
