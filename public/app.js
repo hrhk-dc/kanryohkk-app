@@ -966,7 +966,36 @@ function setMenu(open) {
   document.body.classList.toggle("menu-open", open);
   document.querySelector("header.topbar")?.toggleAttribute("inert", open);
   document.querySelector("main")?.toggleAttribute("inert", open);
+  if (open) placeMenuPanel();
 }
+
+// メニューの出し方：ボタンがいる端と反対の、画面の内側へ。ボタンに被らず、画面の中に収める（角は両方向とも内側）
+function placeMenuPanel() {
+  const panel = $("#menuPanel");
+  if (!panel) return;
+  const r = menuBtn.getBoundingClientRect();
+  const W = innerWidth, H = innerHeight, G = 8, M = 8;   // G：ボタンとのすき間 / M：画面の端からの余白
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const pw = panel.offsetWidth, ph = panel.offsetHeight;
+  const dl = cx, dr = W - cx, dt = cy, db = H - cy;      // 各端までの距離
+  let left, top;
+  if (Math.min(dl, dr) <= Math.min(dt, db)) {
+    // 左右の端が近い：左右に出す（左端なら右側、右端なら左側）。上下は、ボタンの近い側にそろえる
+    left = dl < dr ? r.right + G : r.left - G - pw;
+    top = cy < H / 2 ? r.top : r.bottom - ph;
+  } else {
+    // 上下の端が近い：上下に出す（上端なら下、下端なら上）。左右は、ボタンの近い側にそろえる
+    top = dt < db ? r.bottom + G : r.top - G - ph;
+    left = cx < W / 2 ? r.left : r.right - pw;
+  }
+  left = Math.min(Math.max(left, M), W - pw - M);
+  top = Math.min(Math.max(top, M), H - ph - M);
+  panel.style.left = `${Math.round(left)}px`;
+  panel.style.top = `${Math.round(top)}px`;
+  panel.style.right = "auto";
+  panel.style.bottom = "auto";
+}
+window.addEventListener("resize", () => { if (menuLayer.classList.contains("open")) placeMenuPanel(); });
 menuBtn.addEventListener("click", () => {
   if (menuBtn.dataset.justDragged) return; // 動かしたあとの離しは、メニューを開かない
   setMenu(!menuLayer.classList.contains("open"));
@@ -994,10 +1023,11 @@ function menuPosApply() {
   const f = Math.min(Math.max(v.pos, 0), 1);
   const alongX = Math.round(MENU_EDGE_M + f * (innerWidth - MENU_SIZE - 2 * MENU_EDGE_M));
   const alongY = Math.round(MENU_EDGE_M + f * (innerHeight - MENU_SIZE - 2 * MENU_EDGE_M));
-  if (v.edge === "top") { s.top = `calc(${MENU_EDGE_M}px + env(safe-area-inset-top))`; s.left = `${alongX}px`; }
-  else if (v.edge === "bottom") { s.bottom = `calc(${MENU_EDGE_M}px + env(safe-area-inset-bottom))`; s.left = `${alongX}px`; }
-  else if (v.edge === "left") { s.left = `${MENU_EDGE_M}px`; s.top = `${alongY}px`; }
-  else { s.right = `${MENU_EDGE_M}px`; s.top = `${alongY}px`; }
+  // 使わない辺も必ず auto にする（スタイルシートの既定の top・right が残ると、端に置けない）
+  if (v.edge === "top") { s.top = `calc(${MENU_EDGE_M}px + env(safe-area-inset-top))`; s.bottom = "auto"; s.left = `${alongX}px`; s.right = "auto"; }
+  else if (v.edge === "bottom") { s.bottom = `calc(${MENU_EDGE_M}px + env(safe-area-inset-bottom))`; s.top = "auto"; s.left = `${alongX}px`; s.right = "auto"; }
+  else if (v.edge === "left") { s.left = `${MENU_EDGE_M}px`; s.right = "auto"; s.top = `${alongY}px`; s.bottom = "auto"; }
+  else { s.right = `${MENU_EDGE_M}px`; s.left = "auto"; s.top = `${alongY}px`; s.bottom = "auto"; }
 }
 let menuDrag = null;
 // 動かしている間は、画面全体で指を追う（ボタンの外へ速く出ても、離した所まで続ける）
@@ -1019,7 +1049,7 @@ function menuDragMove(e) {
   const x = Math.min(Math.max(e.clientX - MENU_SIZE / 2, 0), innerWidth - MENU_SIZE);
   const y = Math.min(Math.max(e.clientY - MENU_SIZE / 2, 0), innerHeight - MENU_SIZE);
   menuBtn.style.top = `${Math.round(y)}px`; menuBtn.style.left = `${Math.round(x)}px`;
-  menuBtn.style.right = ""; menuBtn.style.bottom = "";
+  menuBtn.style.right = "auto"; menuBtn.style.bottom = "auto";
 }
 function menuDragEnd(e, cancel) {
   if (!menuDrag || menuDrag.id !== e.pointerId) return;
