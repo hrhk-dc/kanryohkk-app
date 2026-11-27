@@ -45,13 +45,7 @@ async function run(reverseMode) {
     await page.click('.app-seg[data-app="ml"]'); await wait(page, 900);
     await page.evaluate(() => { document.body.style.minHeight = '3000px'; });
 
-    // 1) スクロールの飛び：メニューの「お気に入り条件」で、下へ勝手に行かない
-    await page.evaluate(() => window.scrollTo(0, 0)); await wait(page, 300);
-    await page.click('#menuBtn'); await wait(page, 300);
-    await page.evaluate(() => document.querySelector('[data-ml-act="presets"]').click());
-    await wait(page, 1000);
-    const presetsY = await page.evaluate(() => Math.round(window.scrollY));
-    ok('お気に入り条件：押しても、画面は上から（下へ勝手に飛ばない）', presetsY <= 20, `scrollY=${presetsY}`);
+    // 1) お気に入り条件は Round 34 でなくした（この確認は外す）
 
     // 2) 横の縁：横に並ぶ行の両端にグレーの縁（グラデーション）が出ない
     const edges = await page.evaluate(() => {
