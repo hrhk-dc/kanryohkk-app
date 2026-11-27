@@ -1703,6 +1703,38 @@ body.mode-ml .ml-only { display: flex; }
 /* 「このアプリについて」は完了報告の項目。マップリストのメニューには出さない */
 body.mode-ml .dc-only-menu { display: none !important; }
 
+/* Round 23（v78）：提案リストの並び替えは、上のバーの2段目（マップリストの提案リストを開いているときだけ） */
+.ml-sort-bar { display: none; flex: 0 0 100%; order: 3; gap: 6px; margin-top: 8px; flex-wrap: nowrap; }
+body.mode-ml.ml-proposal .ml-sort-bar { display: flex; }
+.ml-sort-btn {
+  height: 34px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px;
+  background: linear-gradient(var(--tile), var(--tile)) padding-box, linear-gradient(var(--glass-line), var(--glass-line)) border-box;
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s var(--ease), background .2s;
+}
+.ml-sort-btn:hover { background: linear-gradient(var(--tile-hi), var(--tile-hi)) padding-box, linear-gradient(var(--glass-line), var(--glass-line)) border-box; }
+.ml-sort-btn.on { background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--ring) border-box; }
+.ml-sort-btn:active { transform: scale(.96); }
+
+/* ================================================================
+   Round 27（v82）：ヘッダーの切り替えを大きく（390pxに収める）。三本線メニューの一番上にもう一方のモードへのボタン
+   ================================================================ */
+.app-seg { height: 40px; font-size: 14px; }
+@media (max-width: 480px) {
+  /* 390pxの幅に、タイトル・切り替え・三本線ボタンを収める（切り替えのアイコンは外す） */
+  .app-seg { height: 40px; padding: 0 10px; font-size: 14px; gap: 0; }
+  .app-seg-ic { display: none; }
+  .app-switch { padding: 3px; }
+}
+/* 三本線メニューの一番上：もう一方のモードへ（今開いている方のボタンは出さない） */
+.menu-go { display: flex; flex-direction: column; gap: 8px; }
+body.mode-ml [data-app-go="ml"], body:not(.mode-ml) [data-app-go="dc"] { display: none !important; }
+body:not(.member) .menu-go { display: none !important; }
+.menu-go-btn {
+  justify-content: center; font-size: 16px; font-weight: 700; color: #fff;
+  border: 2px solid transparent; background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--k-ring) border-box;
+}
+
 /* 下のタブ：完了報告の棒を、マップリストでも使う（同じ見た目・同じ動き）。モードで中身だけ替える */
 body:not(.mode-ml) .ml-tab { display: none !important; }
 body.mode-ml #mainNav > .tab:not(.ml-tab) { display: none !important; }

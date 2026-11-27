@@ -47,6 +47,7 @@
     map: '<path d="M9 4L3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/>',
     copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
     cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
@@ -90,8 +91,8 @@
       rating: s.rating >= 4.5 ? 5 : s.rating >= 4 ? 4 : s.rating >= 3.5 ? 3 : s.rating >= 3 ? 2 : 1,
       reviews: s.reviews >= 200 ? 5 : s.reviews >= 100 ? 4 : s.reviews >= 50 ? 3 : s.reviews >= 10 ? 2 : 1,
       // 開業年・従業員数は Google Places に無いので、分からない店は3点（中立）
-      fresh: s.opened == null ? 3 : age <= 2 ? 5 : age <= 5 ? 4 : age <= 10 ? 3 : age <= 20 ? 2 : 1,
-      fit: s.staff == null ? 3 : s.staff <= 5 ? 5 : s.staff <= 10 ? 4 : s.staff <= 30 ? 3 : 2,
+      fresh: s.opened == null ? null : age <= 2 ? 5 : age <= 5 ? 4 : age <= 10 ? 3 : age <= 20 ? 2 : 1,
+      fit: s.staff == null ? null : s.staff <= 5 ? 5 : s.staff <= 10 ? 4 : s.staff <= 30 ? 3 : 2,
     };
   }
 
@@ -139,16 +140,35 @@
     let picked = ranked.filter((k) => sub[k] >= 4);
     if (picked.length < 3) picked = ranked.slice(0, 3);
     const list = picked.slice(0, 4).map((k) => reasonDetail({ ...s, sub }, k));
-    if (s.distance <= 1000 && list.length < 5) {
+    // 4つにそろえる：近い店（1km以内）の移動の話 → 店のデータから作る特徴（作れなければ、そのままの数）
+    if (s.distance <= 1000 && list.length < 4) {
       const near = s.distance < 300 ? 'すぐ近くにあり' : `現在地から${fmtDist(s.distance)}と近く`;
       list.push(`${near}、移動の負担が少なく回れます`);
     }
-    return list;
+    for (const f of featureFill(s)) { if (list.length >= 4) break; list.push(f); }
+    return list.slice(0, 4);
+  }
+
+  // 店のデータから作る、その店らしい特徴（取れているものだけ。無いものは作らない）
+  function featureFill(s) {
+    const out = [];
+    // 営業時間の閉店（「11:00〜21:00」の後ろの時刻）が遅いか
+    const closes = Object.values(s.hours || {})
+      .map((t) => (typeof t === 'string' ? (t.match(/〜\s*(\d{1,2})/) || [])[1] : null))
+      .filter(Boolean).map(Number);
+    const latest = closes.length ? Math.max(...closes) : null;
+    if (latest != null && latest >= 21) out.push(`閉店が${latest}時と遅く、夜の時間帯にも訪問しやすいお店です`);
+    if (s.insta) out.push('SNSで店の情報を発信しています');
+    if (s.industry) out.push(`業種は「${s.industry}」のお店です`);
+    return out;
   }
 
   function withScores(s) {
     const sub = subScores(s);
-    const total5 = KEYS.reduce((a, k) => a + sub[k] * W[k], 0);
+    // 取れた項目だけで平均する（取れなかった項目は3で埋めず、平均に入れない）
+    const usable = KEYS.filter((k) => sub[k] != null);
+    const wSum = usable.reduce((a, k) => a + W[k], 0);
+    const total5 = usable.reduce((a, k) => a + sub[k] * W[k], 0) / wSum;
     const overall = Math.round(total5 * 2 * 10) / 10;
     return { ...s, sub, total5, overall, reasons: buildReasons(s, sub) };
   }
@@ -176,6 +196,7 @@
     pSort: 'rec',
     pView: 'list',           // 提案の表示：一覧（list）か地図（map）
     pIndustries: new Set(),  // 提案画面の業種絞り込み（空＝全業種）
+    pIndOpen: false,         // 業種の一覧を開いているか（最初は閉じる）
     openOnly: true,
     expanded: new Set(),
     visit: [],                   // [{id, shop, visitDate}]。完了報告アプリの訪問リスト（visits）と同じもの（syncVisits で読む）
@@ -185,6 +206,47 @@
   };
   let pendingCount = 5;
   let dateCb = null;
+
+  // ---------- 再読み込みしても消えないように（端末内。検索条件・提案の候補・表示の状態） ----------
+  // 訪問予定・後で訪問は完了報告の visits（Firestore）から読むので、ここには入れない。
+  // 候補（提案）は、同じ日（JST）のものだけ戻す。前の日の候補は消して、もう一度検索してもらう。
+  const UI_KEY = 'ui';
+  let uiSaveTimer = null;
+  function saveUi() {
+    LS.set(UI_KEY, {
+      day: today, at: Date.now(),
+      area: state.area, radius: state.radius, count: state.count, date: state.date,
+      industries: [...state.industries], indTab: state.indTab,
+      pool: state.pool, snap: state.snap,
+      pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries], pIndOpen: state.pIndOpen,
+      openOnly: state.openOnly, expanded: [...state.expanded], listSort: state.listSort,
+      screen: curScreen,
+    });
+  }
+  function saveUiSoon() { clearTimeout(uiSaveTimer); uiSaveTimer = setTimeout(saveUi, 300); }
+  // 戻せたら true。前の日の候補があって消したときは 'stale' を返す
+  function restoreUi() {
+    const d = LS.get(UI_KEY, null);
+    if (!d || typeof d !== 'object') return null;
+    const sameDay = d.day === today;
+    const arr = (v) => (Array.isArray(v) ? v : []);
+    if (d.area && typeof d.area === 'object') state.area = { ...state.area, ...d.area };
+    if (RADIUS.some((r) => r[0] === d.radius)) state.radius = d.radius;
+    if (Number.isFinite(d.count)) state.count = d.count;
+    state.date = sameDay && d.date ? d.date : addDays(today, 1);
+    state.industries = new Set(arr(d.industries));
+    if (Number.isFinite(d.indTab)) state.indTab = d.indTab;
+    if (Object.prototype.hasOwnProperty.call(SORTERS, d.pSort)) state.pSort = d.pSort;
+    if (d.pView === 'map' || d.pView === 'list') state.pView = d.pView;
+    state.pIndustries = new Set(arr(d.pIndustries));
+    state.pIndOpen = d.pIndOpen === true;
+    if (typeof d.openOnly === 'boolean') state.openOnly = d.openOnly;
+    state.expanded = new Set(arr(d.expanded));
+    if (typeof d.listSort === 'string') state.listSort = d.listSort;
+    if (SCREENS.includes(d.screen)) curScreen = d.screen;
+    if (sameDay && arr(d.pool).length) { state.pool = d.pool; state.snap = d.snap || null; return 'restored'; }
+    return arr(d.pool).length ? 'stale' : 'restored';
+  }
 
   // ---------- 共通の部品 ----------
   const weekRange = (k) => { const d = addDays(today, k); return d; };
@@ -343,7 +405,16 @@
       ${a.mode === 'address'
         ? `<label class="field"><span class="sr">住所・町名</span><input id="addr" type="text" placeholder="例：〇〇区〇〇" value="${esc(a.address)}" autocomplete="off"></label>`
         : `<button class="btn wide" data-act="gps">${ic('gps')}${a.lat == null ? '現在地を取得する' : '現在地を取得済み（取り直す）'}</button>
-           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : (a.place ? `${esc(a.place)}付近の周りから探します。` : '現在地の周りから探します。')}</p>`}`;
+           ${a.lat == null ? '<p class="hint">位置情報を許可すると、今いる場所の周りから探します。</p>' : hereHTML(a)}`}`;
+  }
+  // 取った現在地の住所（何県・何市・何町）を、ボタンの下にはっきり出す。調べ中・取れなかったときも分かるように
+  function hereHTML(a) {
+    const name = a.place ? esc(a.place) : (a.place === '' ? '住所は取れませんでした' : '住所を調べています…');
+    return `<div class="here" aria-live="polite">
+        <span class="here-label">${ic('gps')}今いる場所</span>
+        <strong class="here-name">${name}</strong>
+        <p class="hint">この場所の周りから探します。</p>
+      </div>`;
   }
 
   function renderRadius() {
@@ -416,9 +487,10 @@
 
   function renderProposal() {
     const sn = state.snap;
+    // 並び替えは、完了報告アプリの上のバーに出す（その並びの印を合わせる）
+    window.dispatchEvent(new CustomEvent('ml-proposal', { detail: { sort: state.pSort } }));
     if (!sn) {
       $('#pSummary').textContent = 'まだ提案がありません。';
-      $('#pSort').innerHTML = '';
       $('#pView').innerHTML = '';
       $('#pInd').innerHTML = '';
       $('#pOpenLabel').textContent = '';
@@ -426,14 +498,17 @@
       return;
     }
     $('#pSummary').textContent = `${sn.area}／半径 ${sn.radius}／${sn.count}件／訪問日 ${fmtDate(state.date)}／${sn.industry}`;
-    $('#pSort').innerHTML = [['rec', 'おすすめ順'], ['dist', '近い順'], ['rating', '評価順']].map(([k, l]) =>
-      `<button class="${state.pSort === k ? 'on' : ''}" data-act="p-sort" data-v="${k}">${l}</button>`).join('');
+    // 一覧／地図の切り替えは、画面の下のドックに出す
     $('#pView').innerHTML = [['list', '一覧'], ['map', '地図で見る']].map(([k, l]) =>
       `<button class="${state.pView === k ? 'on' : ''}" data-act="p-view" data-v="${k}">${l}</button>`).join('');
 
     const inds = [...new Set(state.pool.map((s) => s.industry))];
     $('#pInd').innerHTML = inds.map((n) => `<button class="chip${state.pIndustries.has(n) ? ' on' : ''}" data-act="p-ind" data-name="${esc(n)}">${esc(n)}</button>`).join('')
       || '<p class="hint">候補がありません</p>';
+    // 業種は折りたたみ。閉じているときも、選んだ業種が分かるように小さく出す
+    const picked = [...state.pIndustries];
+    $('#pIndSum').textContent = picked.length ? `${picked.slice(0, 2).join('・')}${picked.length > 2 ? ` ほか${picked.length - 2}件` : ''}` : '全業種';
+    $('#pIndFold').open = !!state.pIndOpen;
 
     $('#pOpenLabel').textContent = `${fmtDate(state.date)}営業している店のみ`;
     const sw = $('#pOpen');
@@ -451,17 +526,20 @@
   }
 
   function overallDetail(s) {
-    const rows = KEYS.map((k) => `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`).join('');
+    const rows = KEYS.map((k) => (s.sub[k] == null
+      ? `<tr><td>${LABEL[k]}</td><td>未取得（平均に入れない）</td><td>—</td></tr>`
+      : `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`)).join('');
     return `<div class="detail"><p class="detail-title">点数の計算</p>
       <table class="calc">${rows}
         <tr class="sum"><td>合計（5点満点）</td><td></td><td>${s.total5.toFixed(2)}</td></tr>
         <tr class="sum"><td>10点満点にする</td><td>2倍</td><td>${s.overall.toFixed(1)}</td></tr>
       </table>
-      <p class="hint">4項目の重み：評価25%・口コミ25%・新しさ20%・成約しやすさ30%。各項目は5点満点です。</p></div>`;
+      <p class="hint">4項目の重み：評価25%・口コミ25%・新しさ20%・成約しやすさ30%。各項目は5点満点です。取れなかった項目は平均に入れず、取れた項目だけで割ります。</p></div>`;
   }
 
   function scoreDetail(s, k) {
-    return `<div class="detail"><p class="detail-title">${LABEL[k]}：${s.sub[k]}点／5点</p>
+    const score = s.sub[k] == null ? '未取得（平均に入れていません）' : `${s.sub[k]}点／5点`;
+    return `<div class="detail"><p class="detail-title">${LABEL[k]}：${score}</p>
       <dl><dt>根拠</dt><dd>${esc(evidence(s, k))}</dd>
       <dt>理由</dt><dd>${esc(WHY[k])}</dd>
       <dt>点数の決め方（基準）</dt><dd>${esc(CRIT[k])}</dd></dl></div>`;
@@ -482,7 +560,7 @@
       </div>
       <h3 class="shop-name">${esc(s.name)}</h3>
       ${exp('overall') ? overallDetail(s) : ''}
-      <div class="scores">${KEYS.map((k) => `<button class="score${exp(k) ? ' open' : ''}" data-act="p-expand" data-id="${s.id}" data-k="${k}"><span>${LABEL[k]}</span><b>${s.sub[k]}</b><small>/5</small></button>`).join('')}</div>
+      <div class="scores">${KEYS.map((k) => `<button class="score${exp(k) ? ' open' : ''}" data-act="p-expand" data-id="${s.id}" data-k="${k}"><span>${LABEL[k]}</span><b>${s.sub[k] == null ? '—' : s.sub[k]}</b><small>/5</small></button>`).join('')}</div>
       ${KEYS.map((k) => (exp(k) ? scoreDetail(s, k) : '')).join('')}
       <ul class="reasons">${s.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
       <p class="meta">${ic('pin')}<span>${esc(s.address)}</span></p>
@@ -674,6 +752,7 @@
       state.openOnly = true;
       state.expanded = new Set();
       go('proposal');
+      saveUiSoon();
     } catch (e) {
       toast(e && e.message ? e.message : '取得に失敗しました。時間をおいてもう一度お試しください');
     } finally {
@@ -691,15 +770,30 @@
       state.userPos = { lat: p.coords.latitude, lng: p.coords.longitude };
       renderArea();
       toast('現在地を取得しました');
-      // 付近の地名を取って、表示を差し替える。取れなければ「現在地の周りから探します。」のまま
-      const at = state.userPos;
-      D.placeName(at).then((name) => {
-        if (state.userPos !== at) return; // 取り直していたら、古い結果は捨てる
-        state.area.place = name;
-        renderArea();
-      }).catch(() => {});
+      saveUiSoon();
+      resolvePlace();
       if (done) done();
     }, () => toast('現在地を取得できませんでした'), { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+  }
+
+  // 現在地の住所（何県・何市・何町）を取る。取れたら表示して端末に保存する。取れなければ「取れませんでした」と出す
+  function resolvePlace() {
+    const at = { lat: state.area.lat, lng: state.area.lng };
+    if (at.lat == null) return;
+    const same = () => state.area.lat === at.lat && state.area.lng === at.lng; // 取り直していたら、古い結果は捨てる
+    state.area.place = null;
+    renderArea();
+    D.placeName(at).then((name) => {
+      if (!same()) return;
+      state.area.place = name || '';
+      renderArea();
+      saveUiSoon();
+    }).catch(() => {
+      if (!same()) return;
+      state.area.place = '';
+      renderArea();
+      saveUiSoon();
+    });
   }
 
   // ---------- 数字選択（件数）・日付選択 ----------
@@ -922,7 +1016,7 @@
   const PIN = '123456789ABCDEFGHIJK'; // 番号（画面の並びと地図のピンが一致する）
   const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順', rating: '評価順' };
   let mapKey = '';   // 直前に取得した地図の店の並び（同じなら取り直さない）
-  let mapImgUrl = null; // 地図画像の一時URL
+  let mapCur = null;    // 今の地図：{ points, base（店が全部入る中心と拡大）, img（今見えている画像：x, y, zoom, url）}
   let mapReq = 0;
 
   function mapPanelHTML(list) {
@@ -934,27 +1028,261 @@
     </div>`;
   }
 
+  // 世界の地図を 0〜1 の数字で扱う（ズームしても位置がずれない）
+  const MV_W = 640, MV_H = 440;   // 静止画の大きさ（論理px。scale=2 で、きれいな2倍の画像になる）
+  const MV_MAX_ZOOM = 19;
+  const nxOf = (lng) => (lng + 180) / 360;
+  const nyOf = (lat) => { const s = Math.sin((lat * Math.PI) / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
+  const latOf = (ny) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180) / Math.PI;
+  const lngOf = (nx) => nx * 360 - 180;
+  const worldPx = (z) => 256 * 2 ** z; // 拡大 z のときの、世界の1辺（論理px）
+  const latLngOf = (v) => ({ lat: latOf(v.y), lng: lngOf(v.x) });
+  // 店が全部、枠の中に入る中心と拡大を決める（ビューアの基準になる）
+  function fitView(points) {
+    const xs = points.map((p) => nxOf(p.lng)), ys = points.map((p) => nyOf(p.lat));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (let z = 17; z >= 1; z--) {
+      const w = worldPx(z);
+      if ((x1 - x0) * w <= MV_W - 80 && (y1 - y0) * w <= MV_H - 80) return { x: cx, y: cy, zoom: z };
+    }
+    return { x: cx, y: cy, zoom: 1 };
+  }
+
   async function loadMap(list) {
     const points = list.map((s) => ({ lat: s.lat, lng: s.lng }));
     const key = points.map((p) => `${p.lat},${p.lng}`).join('|');
     const req = ++mapReq;
-    const show = (url) => {
+    const show = () => {
       const box = $('#mapBox');
-      if (box) box.innerHTML = `<img class="map-img" src="${url}" alt="店の位置の地図（番号は下の一覧と同じ）">`;
+      if (box && mapCur) box.innerHTML = `<button class="map-open" type="button" data-act="map-open" aria-label="地図を大きく見る"><img class="map-img" src="${mapCur.img.url}" alt="店の位置の地図（番号は下の一覧と同じ）"></button>`;
     };
-    if (key === mapKey && mapImgUrl) return show(mapImgUrl); // 同じ店なら取り直さない
+    if (key === mapKey && mapCur) return show(); // 同じ店なら取り直さない
     try {
-      const blob = await D.mapImage(points);
+      const base = fitView(points);
+      const blob = await D.mapImage(points, { center: latLngOf(base), zoom: base.zoom });
       if (req !== mapReq) return; // 新しい表示があれば、この結果は捨てる
-      if (mapImgUrl) URL.revokeObjectURL(mapImgUrl);
-      mapImgUrl = URL.createObjectURL(blob);
+      mvClose(); // 表示中のビューアは閉じてから、古い画像を捨てる
+      if (mapCur) URL.revokeObjectURL(mapCur.img.url);
+      mapCur = { points, base, img: { x: base.x, y: base.y, zoom: base.zoom, url: URL.createObjectURL(blob) } };
       mapKey = key;
-      show(mapImgUrl);
+      show();
     } catch (e) {
       if (req !== mapReq) return;
       const box = $('#mapBox');
       if (box) box.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
     }
+  }
+
+  // ---------- 地図の画像ビューア（画像アプリのように、拡大・縮小・移動・閉じる） ----------
+  // 画面の中心を、世界の上の位置（vc）と拡大（zv）で持つ。画像は img（どの位置・拡大で取ったか）の分だけ伸ばして出す。
+  let mv = null;
+  const mvK0 = () => Math.min(mv.el.clientWidth / MV_W, mv.el.clientHeight / MV_H); // 画面px / 論理px（画面の幅か高さに入る大きさ）
+
+  function mvApply() {
+    if (!mv) return;
+    const k0 = mvK0(), w = worldPx(mv.zv) * k0;
+    const dx = (mv.img.x - mv.vc.x) * w, dy = (mv.img.y - mv.vc.y) * w;
+    const sc = k0 * 2 ** (mv.zv - mv.img.zoom);
+    if (mv.pic.getAttribute('src') !== mv.img.url) mv.pic.src = mv.img.url;
+    mv.pic.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(4)})`;
+    mv.zoomEl.textContent = `${Math.round(2 ** (mv.zv - mv.base.zoom) * 100)}%`;
+  }
+  // 画面の (px, py)（中心からの位置）の下にある場所を動かさずに拡大・縮小する
+  function mvZoomAt(nz, px, py) {
+    const z = Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, nz));
+    const k0 = mvK0(), w0 = worldPx(mv.zv) * k0, w1 = worldPx(z) * k0;
+    const under = { x: mv.vc.x + px / w0, y: mv.vc.y + py / w0 };
+    mv.zv = z;
+    mv.vc = { x: under.x - px / w1, y: under.y - py / w1 };
+    mvApply();
+  }
+  function mvPan(dx, dy) {
+    const w = worldPx(mv.zv) * mvK0();
+    mv.vc = { x: mv.vc.x - dx / w, y: mv.vc.y - dy / w };
+    mvApply();
+  }
+  // 今見えている画像では粗い（拡大しすぎ・中心がずれた）ときだけ、取り直す
+  function mvNeedFetch() {
+    if (Math.abs(mv.zv - mv.img.zoom) >= 0.5) return true;
+    if (mv.zv <= mv.base.zoom + 0.05) return false; // 元の大きさのままなら、取り直さない
+    const w = worldPx(mv.zv) * mvK0();
+    return Math.abs(mv.img.x - mv.vc.x) * w > 140 || Math.abs(mv.img.y - mv.vc.y) * w > 100;
+  }
+  function mvScheduleFetch() {
+    if (!mv) return;
+    clearTimeout(mv.timer);
+    if (mvNeedFetch()) mv.timer = setTimeout(mvFetch, 280);
+  }
+  function mvNote(text) { if (mv) mv.note.textContent = text; }
+  // 今の中心・拡大で、詳しい地図を取り直す（既存の /api/ml-map に中心と拡大を渡す）
+  function mvFetch() {
+    if (!mv) return;
+    const z = Math.round(Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, mv.zv)));
+    const c = { x: mv.vc.x, y: mv.vc.y };
+    const seq = ++mv.seq;
+    mvNote('詳しい地図を読み込んでいます…');
+    D.mapImage(mv.points, { center: latLngOf(c), zoom: z }).then((blob) => {
+      if (!mv || seq !== mv.seq) return; // 後から別の取り直しが始まっていれば、この結果は捨てる
+      const prev = mv.own;
+      mv.own = URL.createObjectURL(blob);
+      mv.img = { x: c.x, y: c.y, zoom: z, url: mv.own };
+      mvApply();
+      if (prev) URL.revokeObjectURL(prev);
+      mvNote('');
+    }).catch((e) => {
+      if (!mv || seq !== mv.seq) return;
+      mvNote((e && e.message) || '詳しい地図を取れませんでした。もう一度お試しください');
+    });
+  }
+  function mvReset() {
+    const prev = mv.own;
+    mv.own = null; mv.img = mv.baseImg; mv.seq++;
+    clearTimeout(mv.timer);
+    mv.zv = mv.base.zoom; mv.vc = { x: mv.base.x, y: mv.base.y };
+    mvApply();
+    if (prev) URL.revokeObjectURL(prev);
+    mvNote('');
+  }
+  function mvAnim(fn) {
+    mv.stage.classList.add('anim');
+    fn();
+    clearTimeout(mv.animT);
+    mv.animT = setTimeout(() => { if (mv) mv.stage.classList.remove('anim'); }, 240);
+  }
+  function mvCenterOf(e) {
+    const r = mv.el.getBoundingClientRect();
+    return { x: e.clientX - (r.left + r.width / 2), y: e.clientY - (r.top + r.height / 2) };
+  }
+  function mvPinchState() {
+    const [a, b] = [...mv.ptrs.values()];
+    const r = mv.el.getBoundingClientRect();
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2 - (r.left + r.width / 2), y: (a.y + b.y) / 2 - (r.top + r.height / 2) } };
+  }
+  function mvDown(e) {
+    if (!mv) return;
+    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    mv.stage.setPointerCapture(e.pointerId);
+    mv.stage.classList.remove('anim');
+    if (mv.ptrs.size === 1) {
+      mv.startY = e.clientY;
+      const now = Date.now();
+      // ダブルタップ：同じ場所を続けて押すと、そこを一段拡大する
+      if (mv.lastTap && now - mv.lastTap.t < 320 && Math.hypot(e.clientX - mv.lastTap.x, e.clientY - mv.lastTap.y) < 30) {
+        mv.lastTap = null;
+        const p = mvCenterOf(e);
+        mvAnim(() => mvZoomAt(mv.zv + 1, p.x, p.y));
+        mvScheduleFetch();
+      } else {
+        mv.lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+    } else if (mv.ptrs.size === 2) {
+      mv.lastTap = null;
+      mv.pinch = mvPinchState();
+    }
+  }
+  function mvMove(e) {
+    if (!mv || !mv.ptrs.has(e.pointerId)) return;
+    const prev = mv.ptrs.get(e.pointerId);
+    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (mv.ptrs.size === 1) {
+      if (mv.zv > mv.base.zoom + 0.05) {
+        // 拡大しているとき：ドラッグで移動
+        mv.stage.classList.add('drag');
+        mvPan(e.clientX - prev.x, e.clientY - prev.y);
+      } else {
+        // 元の大きさのとき：下へスワイプすると、閉じる途中の見た目になる
+        const dy = e.clientY - mv.startY;
+        if (dy > 0) {
+          mv.sheet.style.transform = `translateY(${dy}px)`;
+          mv.el.style.background = `rgba(5, 6, 9, ${Math.max(0.25, 0.96 - dy / 500).toFixed(2)})`;
+        }
+      }
+    } else if (mv.ptrs.size === 2 && mv.pinch) {
+      // 2本指：指の中心の移動と、指の開き・閉じで拡大・縮小（指の下の場所は動かない）
+      mv.stage.classList.add('drag');
+      const now = mvPinchState();
+      mvPan(now.mid.x - mv.pinch.mid.x, now.mid.y - mv.pinch.mid.y);
+      if (mv.pinch.dist > 0 && now.dist > 0) mvZoomAt(mv.zv + Math.log2(now.dist / mv.pinch.dist), now.mid.x, now.mid.y);
+      mv.pinch = now;
+    }
+  }
+  function mvUp(e) {
+    if (!mv || !mv.ptrs.has(e.pointerId)) return;
+    mv.ptrs.delete(e.pointerId);
+    if (mv.ptrs.size === 1) mv.pinch = null;
+    if (mv.ptrs.size !== 0) return;
+    mv.stage.classList.remove('drag');
+    const dy = e.clientY - mv.startY;
+    if (mv.zv <= mv.base.zoom + 0.05 && dy > 110) return mvClose();
+    mv.sheet.style.transform = '';
+    mv.el.style.background = '';
+    mvScheduleFetch();
+  }
+  function mvWheel(e) {
+    if (!mv) return;
+    e.preventDefault();
+    const p = mvCenterOf(e);
+    mvZoomAt(mv.zv - Math.sign(e.deltaY) * 0.5, p.x, p.y);
+    mvScheduleFetch();
+  }
+  function mvKey(e) { if (e.key === 'Escape') mvClose(); }
+
+  function openMapViewer() {
+    if (!mapCur || mv) return;
+    const el = document.createElement('div');
+    el.className = 'mv';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', '地図（拡大して見られます）');
+    el.innerHTML = `<div class="mv-sheet">
+        <div class="mv-stage"><img class="mv-pic" alt="店の位置の地図（番号は一覧と同じ）" draggable="false"></div>
+        <div class="mv-top">
+          <span class="mv-title">店の位置</span>
+          <button type="button" class="mv-btn mv-close" aria-label="閉じる">${ic('x')}</button>
+        </div>
+        <div class="mv-bottom">
+          <p class="mv-hint">ピンチで拡大・縮小 ／ ダブルタップで拡大 ／ 下にスワイプで閉じる</p>
+          <div class="mv-tools">
+            <button type="button" class="mv-btn" data-mv="out" aria-label="縮小">${ic('minus')}</button>
+            <button type="button" class="mv-btn mv-wide" data-mv="reset">全体</button>
+            <button type="button" class="mv-btn" data-mv="in" aria-label="拡大">${ic('plus')}</button>
+            <span class="mv-zoom">100%</span>
+          </div>
+          <p class="mv-note" aria-live="polite"></p>
+        </div>
+      </div>`;
+    root.appendChild(el);
+    mv = {
+      el, sheet: el.querySelector('.mv-sheet'), stage: el.querySelector('.mv-stage'), pic: el.querySelector('.mv-pic'),
+      zoomEl: el.querySelector('.mv-zoom'), note: el.querySelector('.mv-note'),
+      points: mapCur.points, base: mapCur.base, baseImg: mapCur.img,
+      img: mapCur.img, own: null, zv: mapCur.base.zoom, vc: { x: mapCur.base.x, y: mapCur.base.y },
+      seq: 0, timer: null, animT: null, ptrs: new Map(), pinch: null, startY: 0, lastTap: null,
+    };
+    mv.stage.addEventListener('pointerdown', mvDown);
+    mv.stage.addEventListener('pointermove', mvMove);
+    mv.stage.addEventListener('pointerup', mvUp);
+    mv.stage.addEventListener('pointercancel', mvUp);
+    mv.stage.addEventListener('wheel', mvWheel, { passive: false });
+    el.querySelector('.mv-close').addEventListener('click', mvClose);
+    el.querySelectorAll('[data-mv]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.mv;
+      if (k === 'reset') return mvAnim(mvReset);
+      mvAnim(() => mvZoomAt(mv.zv + (k === 'in' ? 1 : -1), 0, 0));
+      mvScheduleFetch();
+    }));
+    document.addEventListener('keydown', mvKey);
+    mvApply();
+  }
+
+  function mvClose() {
+    if (!mv) return;
+    clearTimeout(mv.timer); clearTimeout(mv.animT);
+    if (mv.own) URL.revokeObjectURL(mv.own);
+    document.removeEventListener('keydown', mvKey);
+    mv.el.remove();
+    mv = null;
   }
 
   // ---------- 固定ヘッダーのメニュー ----------
@@ -999,6 +1327,7 @@
     'menu-logout': () => { closeMenu(); logout(); },
     'menu-login': () => { closeMenu(); login(); },
     'p-view': (el) => { state.pView = el.dataset.v; renderProposal(); },
+    'map-open': () => openMapViewer(),
     'preset-save-ok': () => confirmSavePreset(),
     'ind-tab': (el) => { state.indTab = Number(el.dataset.i); renderInd(); },
     ind: (el) => { const n = el.dataset.name; state.industries.has(n) ? state.industries.delete(n) : state.industries.add(n); renderInd(); },
@@ -1077,15 +1406,30 @@
     renderNav();
     const note = $('#demoNote');
     if (note) note.hidden = !D.isSample;
+    const restored = restoreUi();
+    // 再読み込みしても、保存した現在地の位置と住所が戻る（住所が取れていなかったときは、もう一度取る）
+    if (state.area.lat != null) {
+      state.userPos = { lat: state.area.lat, lng: state.area.lng };
+      if (state.area.place == null) setTimeout(resolvePlace, 0);
+    }
     syncVisits();
     renderAll();
     showScreen();
+    // 操作のたびに、条件・候補・表示の状態を端末に保存する（再読み込みしても戻る）
+    ['input', 'change', 'click'].forEach((ev) => root.addEventListener(ev, saveUiSoon));
+    // 業種の一覧を開いた・閉じたときも覚える（toggle は泡立たないので、捕まえる段階で受ける）
+    root.addEventListener('toggle', (e) => {
+      if (e.target && e.target.id === 'pIndFold') { state.pIndOpen = e.target.open; saveUiSoon(); }
+    }, true);
+    if (restored === 'stale') toast('前の日の提案は消しました。もう一度検索してください');
     D.onVisitsChange(visitsChanged);
     D.onAuthChange(() => refreshUser());
     // 完了報告アプリの三本線メニューから呼ぶ（訪問NG一覧・お気に入り条件）
     window.mlActions = {
       blockList: () => openBlockList(),
       presets: () => goPresets(),
+      // 完了報告アプリの上のバーから、提案リストの並び順を変える
+      sort: (v) => { if (Object.prototype.hasOwnProperty.call(SORTERS, v)) { state.pSort = v; saveUiSoon(); renderProposal(); } },
       go: (name) => go(name), // 下のタブ（完了報告アプリの棒）から画面を切り替える
     };
     await refreshUser(); // 画面は先に出し、ログイン状態は後から反映する

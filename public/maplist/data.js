@@ -194,7 +194,8 @@
     },
 
     // 提案の地図画像（PNG）。店の位置を番号つきのピンで並べたもの。APIキーはサーバーの中だけ
-    async mapImage(points) {
+    // view を渡すと、その中心と拡大で取り直す（画像ビューアで拡大したとき）。省くと店の位置に合わせて自動
+    async mapImage(points, view) {
       const u = await currentUser();
       const headers = { 'Content-Type': 'application/json' };
       if (u) headers.Authorization = 'Bearer ' + (await u.getIdToken());
@@ -203,7 +204,7 @@
         res = await fetch('/api/ml-map', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ points }),
+          body: JSON.stringify(view ? { points, center: view.center, zoom: view.zoom } : { points }),
         });
       } catch (e) {
         throw new Error('通信できませんでした。電波の良いところでもう一度お試しください');

@@ -34,6 +34,12 @@
     <button id="undoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5L4.5 10.5l4 4"/><path d="M4.5 10.5h10a5 5 0 010 10H11"/></svg><span>元に戻す</span></button>
     <button id="redoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 6.5l4 4-4 4"/><path d="M19.5 10.5h-10a5 5 0 000 10H13"/></svg><span>やり直す</span></button>
   </div>
+  <!-- 提案リストの並び替え（マップリストの提案リストを開いているときだけ出す。上のバーと一緒に隠れる・出る） -->
+  <div id="mlSortBar" class="ml-sort-bar" role="group" aria-label="並び替え">
+    <button type="button" class="ml-sort-btn" data-ml-sort="rec">おすすめ順</button>
+    <button type="button" class="ml-sort-btn" data-ml-sort="dist">近い順</button>
+    <button type="button" class="ml-sort-btn" data-ml-sort="rating">評価順</button>
+  </div>
 </header>
 
 <!-- 右上の三本線メニュー（スクロールしても付いてくる。ヘッダーの外に置く） -->
@@ -41,6 +47,12 @@
 <div id="menuLayer" class="menu-layer hidden-logged-out" aria-hidden="true">
   <div id="menuScrim" class="menu-scrim"></div>
   <nav id="menuPanel" class="menu-panel" aria-label="メニュー">
+    <!-- もう一方のモードへ行く（一番上）。今開いている方のボタンは出さない -->
+    <div class="menu-group menu-go">
+      <button class="menu-item menu-go-btn" type="button" data-app-go="ml"><span>Maplistへ</span></button>
+      <button class="menu-item menu-go-btn" type="button" data-app-go="dc"><span>完了報告へ</span></button>
+    </div>
+    <div class="menu-sep" role="separator"></div>
     <div class="menu-group ml-only" id="menuMl">
       <button class="menu-item" type="button" data-ml-act="block"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/></svg><span>訪問NG一覧</span></button>
       <button class="menu-item" type="button" data-ml-act="presets"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg><span>お気に入り条件</span></button>
@@ -146,8 +158,8 @@
         <path id="navRim" fill="none" stroke="url(#nvRim)" stroke-width="1.1"/>
       </svg>
       <button class="tab active" data-tab="today" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>予定</span></button>
-      <button class="tab" data-tab="visits" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span>訪問リスト</span></button>
       <button class="tab" data-tab="form" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg><span>完了報告</span></button>
+      <button class="tab" data-tab="visits" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span>訪問リスト</span></button>
       <button class="tab" data-tab="list" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><circle cx="4" cy="6.5" r="1" /><circle cx="4" cy="12" r="1"/><circle cx="4" cy="17.5" r="1"/></svg><span>報告一覧</span></button>
       <button class="tab hidden" data-tab="stats" id="statsTab" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span>集計</span></button>
       <button class="tab hidden" data-tab="admin" id="adminTab" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg><span>管理</span></button>
@@ -406,8 +418,8 @@
         <h3>タブの説明</h3>
         <dl class="about-list">
           <dt>予定</dt><dd>今日・明日の訪問予定と、報告がまだの訪問を見られます。「報告する」からそのまま完了報告に進めます。</dd>
-          <dt>訪問リスト</dt><dd>翌日に回る訪問先を作ります。Googleマップのリンクを貼ると、店舗名や住所が自動で入ります。</dd>
           <dt>完了報告</dt><dd>訪問の結果を入力して保存します。</dd>
+          <dt>訪問リスト</dt><dd>翌日に回る訪問先を作ります。Googleマップのリンクを貼ると、店舗名や住所が自動で入ります。</dd>
           <dt>報告一覧</dt><dd>これまでの報告を並べます。キーワード・結果・担当者で絞り込めます。</dd>
           <dt>集計</dt><dd>期間ごとの訪問・報告・成約の数と成約率を、担当者別・地域別に見られます。（管理者のみ）</dd>
           <dt>管理</dt><dd>メンバーの追加、入力項目（フォーマット）の編集、CSVのダウンロードができます。（管理者のみ）</dd>
@@ -457,7 +469,6 @@
         <p class="demo-note" id="demoNote" hidden>表示中はサンプルデータです（API未接続）</p>
       </header>
 
-      <div class="card account" id="account"></div>
       <div class="card"><h2 class="sec">エリア</h2><div id="s-area"></div></div>
       <div class="card"><h2 class="sec">半径</h2><div id="s-radius"></div></div>
       <div class="card">
@@ -479,9 +490,10 @@
         <h1>提案リスト</h1>
         <p class="summary" id="pSummary"></p>
       </header>
-      <div class="seg" id="pSort" role="tablist"></div>
-      <div class="seg two view-seg" id="pView" role="tablist"></div>
-      <div class="card"><h2 class="sec">業種で絞り込み</h2><div class="chips" id="pInd"></div></div>
+      <details class="card ind-fold" id="pIndFold">
+        <summary><span class="sec">業種で絞り込み</span><span class="ind-sum" id="pIndSum">全業種</span></summary>
+        <div class="chips" id="pInd"></div>
+      </details>
       <div class="card row-between">
         <span id="pOpenLabel"></span>
         <button class="switch" id="pOpen" role="switch" data-act="open-only" aria-checked="true"></button>
@@ -491,9 +503,8 @@
         <p class="sub">サイトなし・チェーン店除外済み</p>
       </div>
       <div id="pList"></div>
-      <div class="dock two">
-        <button class="btn" data-act="go-search">条件を変えてもう一度</button>
-        <button class="btn primary" data-act="go-list">訪問予定を見る</button>
+      <div class="dock">
+        <div class="seg two view-seg" id="pView" role="tablist"></div>
       </div>
     </section>
 

@@ -111,6 +111,12 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* 業種チップ・タブ */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 業種で絞り込み（折りたたみ）：閉じている時も、選んだ業種を右に小さく出す */
+.ind-fold > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+.ind-fold > summary::-webkit-details-marker { display: none; }
+.ind-fold > summary .sec { margin: 0; }
+.ind-sum { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.ind-fold[open] > summary { margin-bottom: 12px; }
 .chip {
   min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
   background: var(--k-black); color: var(--sub); font-size: 14px;
@@ -188,6 +194,12 @@ button:disabled { opacity: .45; cursor: default; }
 .calc .sum td { font-weight: 700; }
 .reasons { margin: 10px 0 0; padding-left: 18px; color: var(--sub); font-size: 14px; }
 .reasons li { margin: 5px 0; line-height: 1.6; }
+/* 現在地の住所：ボタンの下に、はっきり出す（何県・何市・何町） */
+.here { margin: 10px 0 2px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px var(--line); }
+.here-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.here-label .ic { width: 14px; height: 14px; margin: 0; color: var(--sub); }
+.here-name { display: block; margin-top: 4px; font-size: 16px; font-weight: 700; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.here .hint { margin: 4px 0 0; }
 /* 店カードの上段：順位・業種を左に、総合おすすめ度を右上に */
 .shop-head { justify-content: flex-start; }
 .shop-head .overall { width: auto; min-height: 34px; padding: 0 14px; margin: 0 0 0 auto; gap: 3px; justify-content: center; }
@@ -221,6 +233,10 @@ button:disabled { opacity: .45; cursor: default; }
   background: none; /* 黒い帯は敷かない（ボタンの明るさを活かす） */
 }
 .dock .btn { flex: 1; }
+/* 一覧／地図の切り替え（ドックの中で横いっぱい） */
+.dock .view-seg { flex: 1; }
+/* 「提案リストを作る」は、横いっぱいではなく、少しだけ短く（Round 27） */
+.dock .btn.wide { max-width: 330px; margin: 0 auto; }
 .tabs {
   position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 6;
   height: 62px; border-radius: 31px; display: grid; grid-template-columns: repeat(4, 1fr);
@@ -325,7 +341,7 @@ button:disabled { opacity: .45; cursor: default; }
 .menu-item .ic { color: var(--sub); }
 .menu-item span { flex: 1; }
 .menu-cnt { font-style: normal; font-size: 12px; color: var(--muted); background: var(--k-grey); border-radius: 999px; padding: 2px 8px; }
-.screen { padding-top: 84px; }
+.screen { padding-top: 14px; } /* Round 27：上のバーの下からすぐ見出しに（間を詰める） */
 
 /* 横にスクロールする行の端のグレーの縁（グラデーション）は出さない（ユーザー指示・Round 18） */
 .hwrap { position: relative; }
@@ -383,6 +399,47 @@ button:disabled { opacity: .45; cursor: default; }
   border-radius: 22px; background: #0B0D12; border: 1px solid var(--line);
 }
 .map-img { display: block; width: 100%; height: auto; }
+/* 地図画像：タップすると、全画面の画像ビューアが開く */
+.map-open { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none; cursor: zoom-in; border-radius: 14px; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+/* 画像ビューア（全画面）：ピンチ・ダブルタップ・ドラッグで拡大と移動。下へスワイプか × で閉じる */
+.mv { position: fixed; inset: 0; z-index: 90; background: rgba(5, 6, 9, .96); transition: background .15s; }
+.mv-sheet { position: absolute; inset: 0; }
+.mv-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mv-pic {
+  position: absolute; left: 50%; top: 50%; width: 640px; height: 440px; margin: -220px 0 0 -320px;
+  max-width: none; transform-origin: 50% 50%; pointer-events: none; -webkit-user-drag: none; user-select: none;
+}
+.mv-stage.anim .mv-pic { transition: transform .22s ease-out; }
+.mv-stage.drag .mv-pic { transition: none; }
+.mv-sheet { transition: transform .2s ease-out; }
+.mv-top {
+  position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px;
+  display: flex; align-items: center; justify-content: space-between; pointer-events: none;
+}
+.mv-title {
+  padding: 8px 14px; border-radius: 999px; background: rgba(11, 13, 18, .86);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); font-size: 13px; font-weight: 600; color: var(--text);
+}
+.mv-btn {
+  pointer-events: auto; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(11, 13, 18, .86); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease-out;
+}
+.mv-btn:active { transform: scale(.94); }
+.mv-btn .ic { width: 20px; height: 20px; margin: 0; color: var(--sub); stroke-width: 1.5; }
+.mv-btn.mv-wide { width: auto; padding: 0 16px; }
+.mv-bottom {
+  position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+.mv-tools { display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.mv-tools .mv-btn { pointer-events: auto; }
+.mv-zoom { min-width: 56px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); }
+.mv-hint, .mv-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
+.mv-note:empty { display: none; }
 .map-order { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .map-order li {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;
