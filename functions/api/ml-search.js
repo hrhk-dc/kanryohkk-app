@@ -40,7 +40,7 @@ export async function onRequestPost({ request }) {
       if (hits.length) headers["X-Cache"] = hits.join(",");
       return new Response(JSON.stringify({ ok: true, shops: list, hasMore, total, page: pg, category }), { headers });
     } catch (e) {
-      return json({ ok: false, error: "店舗の取得に失敗しました（地図のデータ・OpenStreetMap が混みあっています）。時間をおいてもう一度お試しください" }, 502);
+      return json({ ok: false, error: `店舗の取得に失敗しました（地図のデータが混みあっています）。時間をおいてもう一度お試しください（${e.detail || "通信できず"}）` }, 502);
     }
   }
 
@@ -55,6 +55,6 @@ export async function onRequestPost({ request }) {
     if (hitsOld.length) headers["X-Cache"] = hitsOld.join(",");
     return new Response(JSON.stringify({ ok: true, shops: out }), { headers });
   } catch (e) {
-    return json({ ok: false, error: "店舗の取得に失敗しました（地図のデータ・OpenStreetMap が混みあっています）。時間をおいてもう一度お試しください" }, 502);
+    return json({ ok: false, error: `店舗の取得に失敗しました（地図のデータが混みあっています）。時間をおいてもう一度お試しください（${e.detail || "通信できず"}）` }, 502);
   }
 }
