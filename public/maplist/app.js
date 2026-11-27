@@ -47,6 +47,7 @@
     map: '<path d="M9 4L3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/>',
     copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
     cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
@@ -969,7 +970,7 @@
   const PIN = '123456789ABCDEFGHIJK'; // 番号（画面の並びと地図のピンが一致する）
   const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順', rating: '評価順' };
   let mapKey = '';   // 直前に取得した地図の店の並び（同じなら取り直さない）
-  let mapImgUrl = null; // 地図画像の一時URL
+  let mapCur = null;    // 今の地図：{ points, base（店が全部入る中心と拡大）, img（今見えている画像：x, y, zoom, url）}
   let mapReq = 0;
 
   function mapPanelHTML(list) {
@@ -981,27 +982,261 @@
     </div>`;
   }
 
+  // 世界の地図を 0〜1 の数字で扱う（ズームしても位置がずれない）
+  const MV_W = 640, MV_H = 440;   // 静止画の大きさ（論理px。scale=2 で、きれいな2倍の画像になる）
+  const MV_MAX_ZOOM = 19;
+  const nxOf = (lng) => (lng + 180) / 360;
+  const nyOf = (lat) => { const s = Math.sin((lat * Math.PI) / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
+  const latOf = (ny) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180) / Math.PI;
+  const lngOf = (nx) => nx * 360 - 180;
+  const worldPx = (z) => 256 * 2 ** z; // 拡大 z のときの、世界の1辺（論理px）
+  const latLngOf = (v) => ({ lat: latOf(v.y), lng: lngOf(v.x) });
+  // 店が全部、枠の中に入る中心と拡大を決める（ビューアの基準になる）
+  function fitView(points) {
+    const xs = points.map((p) => nxOf(p.lng)), ys = points.map((p) => nyOf(p.lat));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (let z = 17; z >= 1; z--) {
+      const w = worldPx(z);
+      if ((x1 - x0) * w <= MV_W - 80 && (y1 - y0) * w <= MV_H - 80) return { x: cx, y: cy, zoom: z };
+    }
+    return { x: cx, y: cy, zoom: 1 };
+  }
+
   async function loadMap(list) {
     const points = list.map((s) => ({ lat: s.lat, lng: s.lng }));
     const key = points.map((p) => `${p.lat},${p.lng}`).join('|');
     const req = ++mapReq;
-    const show = (url) => {
+    const show = () => {
       const box = $('#mapBox');
-      if (box) box.innerHTML = `<img class="map-img" src="${url}" alt="店の位置の地図（番号は下の一覧と同じ）">`;
+      if (box && mapCur) box.innerHTML = `<button class="map-open" type="button" data-act="map-open" aria-label="地図を大きく見る"><img class="map-img" src="${mapCur.img.url}" alt="店の位置の地図（番号は下の一覧と同じ）"></button>`;
     };
-    if (key === mapKey && mapImgUrl) return show(mapImgUrl); // 同じ店なら取り直さない
+    if (key === mapKey && mapCur) return show(); // 同じ店なら取り直さない
     try {
-      const blob = await D.mapImage(points);
+      const base = fitView(points);
+      const blob = await D.mapImage(points, { center: latLngOf(base), zoom: base.zoom });
       if (req !== mapReq) return; // 新しい表示があれば、この結果は捨てる
-      if (mapImgUrl) URL.revokeObjectURL(mapImgUrl);
-      mapImgUrl = URL.createObjectURL(blob);
+      mvClose(); // 表示中のビューアは閉じてから、古い画像を捨てる
+      if (mapCur) URL.revokeObjectURL(mapCur.img.url);
+      mapCur = { points, base, img: { x: base.x, y: base.y, zoom: base.zoom, url: URL.createObjectURL(blob) } };
       mapKey = key;
-      show(mapImgUrl);
+      show();
     } catch (e) {
       if (req !== mapReq) return;
       const box = $('#mapBox');
       if (box) box.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
     }
+  }
+
+  // ---------- 地図の画像ビューア（画像アプリのように、拡大・縮小・移動・閉じる） ----------
+  // 画面の中心を、世界の上の位置（vc）と拡大（zv）で持つ。画像は img（どの位置・拡大で取ったか）の分だけ伸ばして出す。
+  let mv = null;
+  const mvK0 = () => Math.min(mv.el.clientWidth / MV_W, mv.el.clientHeight / MV_H); // 画面px / 論理px（画面の幅か高さに入る大きさ）
+
+  function mvApply() {
+    if (!mv) return;
+    const k0 = mvK0(), w = worldPx(mv.zv) * k0;
+    const dx = (mv.img.x - mv.vc.x) * w, dy = (mv.img.y - mv.vc.y) * w;
+    const sc = k0 * 2 ** (mv.zv - mv.img.zoom);
+    if (mv.pic.getAttribute('src') !== mv.img.url) mv.pic.src = mv.img.url;
+    mv.pic.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(4)})`;
+    mv.zoomEl.textContent = `${Math.round(2 ** (mv.zv - mv.base.zoom) * 100)}%`;
+  }
+  // 画面の (px, py)（中心からの位置）の下にある場所を動かさずに拡大・縮小する
+  function mvZoomAt(nz, px, py) {
+    const z = Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, nz));
+    const k0 = mvK0(), w0 = worldPx(mv.zv) * k0, w1 = worldPx(z) * k0;
+    const under = { x: mv.vc.x + px / w0, y: mv.vc.y + py / w0 };
+    mv.zv = z;
+    mv.vc = { x: under.x - px / w1, y: under.y - py / w1 };
+    mvApply();
+  }
+  function mvPan(dx, dy) {
+    const w = worldPx(mv.zv) * mvK0();
+    mv.vc = { x: mv.vc.x - dx / w, y: mv.vc.y - dy / w };
+    mvApply();
+  }
+  // 今見えている画像では粗い（拡大しすぎ・中心がずれた）ときだけ、取り直す
+  function mvNeedFetch() {
+    if (Math.abs(mv.zv - mv.img.zoom) >= 0.5) return true;
+    if (mv.zv <= mv.base.zoom + 0.05) return false; // 元の大きさのままなら、取り直さない
+    const w = worldPx(mv.zv) * mvK0();
+    return Math.abs(mv.img.x - mv.vc.x) * w > 140 || Math.abs(mv.img.y - mv.vc.y) * w > 100;
+  }
+  function mvScheduleFetch() {
+    if (!mv) return;
+    clearTimeout(mv.timer);
+    if (mvNeedFetch()) mv.timer = setTimeout(mvFetch, 280);
+  }
+  function mvNote(text) { if (mv) mv.note.textContent = text; }
+  // 今の中心・拡大で、詳しい地図を取り直す（既存の /api/ml-map に中心と拡大を渡す）
+  function mvFetch() {
+    if (!mv) return;
+    const z = Math.round(Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, mv.zv)));
+    const c = { x: mv.vc.x, y: mv.vc.y };
+    const seq = ++mv.seq;
+    mvNote('詳しい地図を読み込んでいます…');
+    D.mapImage(mv.points, { center: latLngOf(c), zoom: z }).then((blob) => {
+      if (!mv || seq !== mv.seq) return; // 後から別の取り直しが始まっていれば、この結果は捨てる
+      const prev = mv.own;
+      mv.own = URL.createObjectURL(blob);
+      mv.img = { x: c.x, y: c.y, zoom: z, url: mv.own };
+      mvApply();
+      if (prev) URL.revokeObjectURL(prev);
+      mvNote('');
+    }).catch((e) => {
+      if (!mv || seq !== mv.seq) return;
+      mvNote((e && e.message) || '詳しい地図を取れませんでした。もう一度お試しください');
+    });
+  }
+  function mvReset() {
+    const prev = mv.own;
+    mv.own = null; mv.img = mv.baseImg; mv.seq++;
+    clearTimeout(mv.timer);
+    mv.zv = mv.base.zoom; mv.vc = { x: mv.base.x, y: mv.base.y };
+    mvApply();
+    if (prev) URL.revokeObjectURL(prev);
+    mvNote('');
+  }
+  function mvAnim(fn) {
+    mv.stage.classList.add('anim');
+    fn();
+    clearTimeout(mv.animT);
+    mv.animT = setTimeout(() => { if (mv) mv.stage.classList.remove('anim'); }, 240);
+  }
+  function mvCenterOf(e) {
+    const r = mv.el.getBoundingClientRect();
+    return { x: e.clientX - (r.left + r.width / 2), y: e.clientY - (r.top + r.height / 2) };
+  }
+  function mvPinchState() {
+    const [a, b] = [...mv.ptrs.values()];
+    const r = mv.el.getBoundingClientRect();
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2 - (r.left + r.width / 2), y: (a.y + b.y) / 2 - (r.top + r.height / 2) } };
+  }
+  function mvDown(e) {
+    if (!mv) return;
+    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    mv.stage.setPointerCapture(e.pointerId);
+    mv.stage.classList.remove('anim');
+    if (mv.ptrs.size === 1) {
+      mv.startY = e.clientY;
+      const now = Date.now();
+      // ダブルタップ：同じ場所を続けて押すと、そこを一段拡大する
+      if (mv.lastTap && now - mv.lastTap.t < 320 && Math.hypot(e.clientX - mv.lastTap.x, e.clientY - mv.lastTap.y) < 30) {
+        mv.lastTap = null;
+        const p = mvCenterOf(e);
+        mvAnim(() => mvZoomAt(mv.zv + 1, p.x, p.y));
+        mvScheduleFetch();
+      } else {
+        mv.lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+    } else if (mv.ptrs.size === 2) {
+      mv.lastTap = null;
+      mv.pinch = mvPinchState();
+    }
+  }
+  function mvMove(e) {
+    if (!mv || !mv.ptrs.has(e.pointerId)) return;
+    const prev = mv.ptrs.get(e.pointerId);
+    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (mv.ptrs.size === 1) {
+      if (mv.zv > mv.base.zoom + 0.05) {
+        // 拡大しているとき：ドラッグで移動
+        mv.stage.classList.add('drag');
+        mvPan(e.clientX - prev.x, e.clientY - prev.y);
+      } else {
+        // 元の大きさのとき：下へスワイプすると、閉じる途中の見た目になる
+        const dy = e.clientY - mv.startY;
+        if (dy > 0) {
+          mv.sheet.style.transform = `translateY(${dy}px)`;
+          mv.el.style.background = `rgba(5, 6, 9, ${Math.max(0.25, 0.96 - dy / 500).toFixed(2)})`;
+        }
+      }
+    } else if (mv.ptrs.size === 2 && mv.pinch) {
+      // 2本指：指の中心の移動と、指の開き・閉じで拡大・縮小（指の下の場所は動かない）
+      mv.stage.classList.add('drag');
+      const now = mvPinchState();
+      mvPan(now.mid.x - mv.pinch.mid.x, now.mid.y - mv.pinch.mid.y);
+      if (mv.pinch.dist > 0 && now.dist > 0) mvZoomAt(mv.zv + Math.log2(now.dist / mv.pinch.dist), now.mid.x, now.mid.y);
+      mv.pinch = now;
+    }
+  }
+  function mvUp(e) {
+    if (!mv || !mv.ptrs.has(e.pointerId)) return;
+    mv.ptrs.delete(e.pointerId);
+    if (mv.ptrs.size === 1) mv.pinch = null;
+    if (mv.ptrs.size !== 0) return;
+    mv.stage.classList.remove('drag');
+    const dy = e.clientY - mv.startY;
+    if (mv.zv <= mv.base.zoom + 0.05 && dy > 110) return mvClose();
+    mv.sheet.style.transform = '';
+    mv.el.style.background = '';
+    mvScheduleFetch();
+  }
+  function mvWheel(e) {
+    if (!mv) return;
+    e.preventDefault();
+    const p = mvCenterOf(e);
+    mvZoomAt(mv.zv - Math.sign(e.deltaY) * 0.5, p.x, p.y);
+    mvScheduleFetch();
+  }
+  function mvKey(e) { if (e.key === 'Escape') mvClose(); }
+
+  function openMapViewer() {
+    if (!mapCur || mv) return;
+    const el = document.createElement('div');
+    el.className = 'mv';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', '地図（拡大して見られます）');
+    el.innerHTML = `<div class="mv-sheet">
+        <div class="mv-stage"><img class="mv-pic" alt="店の位置の地図（番号は一覧と同じ）" draggable="false"></div>
+        <div class="mv-top">
+          <span class="mv-title">店の位置</span>
+          <button type="button" class="mv-btn mv-close" aria-label="閉じる">${ic('x')}</button>
+        </div>
+        <div class="mv-bottom">
+          <p class="mv-hint">ピンチで拡大・縮小 ／ ダブルタップで拡大 ／ 下にスワイプで閉じる</p>
+          <div class="mv-tools">
+            <button type="button" class="mv-btn" data-mv="out" aria-label="縮小">${ic('minus')}</button>
+            <button type="button" class="mv-btn mv-wide" data-mv="reset">全体</button>
+            <button type="button" class="mv-btn" data-mv="in" aria-label="拡大">${ic('plus')}</button>
+            <span class="mv-zoom">100%</span>
+          </div>
+          <p class="mv-note" aria-live="polite"></p>
+        </div>
+      </div>`;
+    root.appendChild(el);
+    mv = {
+      el, sheet: el.querySelector('.mv-sheet'), stage: el.querySelector('.mv-stage'), pic: el.querySelector('.mv-pic'),
+      zoomEl: el.querySelector('.mv-zoom'), note: el.querySelector('.mv-note'),
+      points: mapCur.points, base: mapCur.base, baseImg: mapCur.img,
+      img: mapCur.img, own: null, zv: mapCur.base.zoom, vc: { x: mapCur.base.x, y: mapCur.base.y },
+      seq: 0, timer: null, animT: null, ptrs: new Map(), pinch: null, startY: 0, lastTap: null,
+    };
+    mv.stage.addEventListener('pointerdown', mvDown);
+    mv.stage.addEventListener('pointermove', mvMove);
+    mv.stage.addEventListener('pointerup', mvUp);
+    mv.stage.addEventListener('pointercancel', mvUp);
+    mv.stage.addEventListener('wheel', mvWheel, { passive: false });
+    el.querySelector('.mv-close').addEventListener('click', mvClose);
+    el.querySelectorAll('[data-mv]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.mv;
+      if (k === 'reset') return mvAnim(mvReset);
+      mvAnim(() => mvZoomAt(mv.zv + (k === 'in' ? 1 : -1), 0, 0));
+      mvScheduleFetch();
+    }));
+    document.addEventListener('keydown', mvKey);
+    mvApply();
+  }
+
+  function mvClose() {
+    if (!mv) return;
+    clearTimeout(mv.timer); clearTimeout(mv.animT);
+    if (mv.own) URL.revokeObjectURL(mv.own);
+    document.removeEventListener('keydown', mvKey);
+    mv.el.remove();
+    mv = null;
   }
 
   // ---------- 固定ヘッダーのメニュー ----------
@@ -1046,6 +1281,7 @@
     'menu-logout': () => { closeMenu(); logout(); },
     'menu-login': () => { closeMenu(); login(); },
     'p-view': (el) => { state.pView = el.dataset.v; renderProposal(); },
+    'map-open': () => openMapViewer(),
     'preset-save-ok': () => confirmSavePreset(),
     'ind-tab': (el) => { state.indTab = Number(el.dataset.i); renderInd(); },
     ind: (el) => { const n = el.dataset.name; state.industries.has(n) ? state.industries.delete(n) : state.industries.add(n); renderInd(); },
