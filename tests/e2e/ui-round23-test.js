@@ -66,14 +66,14 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       const h1 = document.querySelector('header.topbar h1');
       const r = el.getBoundingClientRect(), hr = h1.getBoundingClientRect();
       return {
-        inHeader: top.contains(el),
+        inHeader: !top.contains(el) && !!el.closest('.ml-sort-wrap'),
         display: getComputedStyle(el).display,
         labels: [...el.querySelectorAll('.ml-sort-btn')].map((b) => b.textContent.trim()),
         on: [...el.querySelectorAll('.ml-sort-btn.on')].map((b) => b.textContent.trim()),
         belowTitle: r.top >= hr.bottom - 1 && r.top - hr.bottom < 40,
       };
     });
-    ok('並び替え：上のバーの中にある（提案リストを開いているとき）', bar.inHeader && bar.display !== 'none', JSON.stringify({ in: bar.inHeader, d: bar.display }));
+    ok('並び替え：上のバーの下に張り付いて出ている（提案リストを開いているとき）', bar.inHeader && bar.display !== 'none', JSON.stringify({ in: bar.inHeader, d: bar.display }));
     ok('並び替え：タイトルのすぐ下に、おすすめ順・近い順・評価順', bar.belowTitle && bar.labels.join('/') === 'おすすめ順/近い順/評価順', JSON.stringify(bar.labels));
     ok('並び替え：今の並び（おすすめ順）に印がつく', bar.on.join() === 'おすすめ順', bar.on.join());
     const oldSort = await sr(() => !!document.getElementById('mlHost').shadowRoot.querySelector('#pSort'));
@@ -89,13 +89,13 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       cls: document.querySelector('header.topbar').classList.contains('hide'),
       op: parseFloat(getComputedStyle(document.querySelector('header.topbar')).opacity),
     }));
-    ok('下にスクロール：並び替えを含む上のバーが消える', hid.cls && hid.op <= 0.05, JSON.stringify(hid));
+    ok('下にスクロール：上のバーが隠れる（並び替えは張り付いたまま）', hid.cls && hid.op <= 0.05, JSON.stringify(hid));
     await page.evaluate(() => window.scrollTo(0, 380)); await wait(page, 900);
     const shown = await page.evaluate(() => ({
       cls: document.querySelector('header.topbar').classList.contains('hide'),
       op: parseFloat(getComputedStyle(document.querySelector('header.topbar')).opacity),
     }));
-    ok('少し上へ戻すと：並び替えを含む上のバーが出てくる', !shown.cls && shown.op >= 0.95, JSON.stringify(shown));
+    ok('少し上へ戻すと：上のバーが出てくる', !shown.cls && shown.op >= 0.95, JSON.stringify(shown));
     await page.evaluate(() => window.scrollTo(0, 0)); await wait(page, 500);
 
     // 3) 並び替えを押すと、並びが変わって印が移る
@@ -162,7 +162,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
 
     // 7) 完了報告に戻ると、並び替えのバーは出ない（マップリストの中だけ）
     await page.click('.app-seg[data-app="dc"]'); await wait(page, 700);
-    const dcBar = await page.evaluate(() => getComputedStyle(document.getElementById('mlSortBar')).display);
+    const dcBar = await page.evaluate(() => getComputedStyle(document.querySelector('.ml-sort-wrap')).display);
     ok('完了報告に戻ると、並び替えのバーは出ない', dcBar === 'none', dcBar);
 
     ok('390px：横スクロールなし', !(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)));

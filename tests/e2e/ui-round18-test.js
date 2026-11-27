@@ -83,11 +83,12 @@ async function run(reverseMode) {
     await wait(page, 300);
     await page.evaluate(() => { document.getElementById('mlHost').shadowRoot.querySelector('[data-act="gps"]').click(); });
     await wait(page, 1200);
-    const hint = await page.evaluate(() => document.getElementById('mlHost').shadowRoot.querySelector('#s-area .hint')?.textContent.trim() || '');
+    // 住所は、現在地のボタンの下の「今いる場所」の箱に出す（Round 25）
+    const here = await page.evaluate(() => document.getElementById('mlHost').shadowRoot.querySelector('#s-area .here-name')?.textContent.trim() || '');
     if (reverseMode === 'ok') {
-      ok('現在地：付近の地名が出る（「東京都テスト区テスト町付近の周りから探します。」）', hint === '東京都テスト区テスト町付近の周りから探します。', hint);
+      ok('現在地：付近の地名が出る（「東京都テスト区テスト町」）', here === '東京都テスト区テスト町', here);
     } else {
-      ok('現在地：付近の地名が取れないときは「現在地の周りから探します。」のまま', hint === '現在地の周りから探します。', hint);
+      ok('現在地：付近の地名が取れないときは「住所は取れませんでした」と出る', here === '住所は取れませんでした', here);
     }
 
     ok('390px：横スクロールなし', !(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)));

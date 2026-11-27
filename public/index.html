@@ -34,13 +34,15 @@
     <button id="undoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5L4.5 10.5l4 4"/><path d="M4.5 10.5h10a5 5 0 010 10H11"/></svg><span>元に戻す</span></button>
     <button id="redoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 6.5l4 4-4 4"/><path d="M19.5 10.5h-10a5 5 0 000 10H13"/></svg><span>やり直す</span></button>
   </div>
-  <!-- 提案リストの並び替え（マップリストの提案リストを開いているときだけ出す。上のバーと一緒に隠れる・出る） -->
+</header>
+<div class="ml-sort-wrap">
+  <!-- 提案リストの並び替え（マップリストの提案リストを開いているときだけ出す。画面の上に張り付いたまま） -->
   <div id="mlSortBar" class="ml-sort-bar" role="group" aria-label="並び替え">
     <button type="button" class="ml-sort-btn" data-ml-sort="rec">おすすめ順</button>
     <button type="button" class="ml-sort-btn" data-ml-sort="dist">近い順</button>
     <button type="button" class="ml-sort-btn" data-ml-sort="rating">評価順</button>
   </div>
-</header>
+</div>
 
 <!-- 右上の三本線メニュー（スクロールしても付いてくる。ヘッダーの外に置く） -->
 <button id="menuBtn" class="menu-btn hidden-logged-out" type="button" aria-label="メニューを開く" aria-expanded="false" aria-controls="menuLayer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15"/></svg></button>

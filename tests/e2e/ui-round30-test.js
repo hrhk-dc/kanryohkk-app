@@ -102,7 +102,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
         cards: root.querySelectorAll('#pList .shop').length,
       };
     });
-    ok('古い保存があっても、業種は3択で表示される', old.segs.join('/') === '飲食店/飲食店以外/全て', JSON.stringify(old.segs));
+    ok('古い保存があっても、業種は3択で表示される', old.segs.join('/') === '全て/飲食店/飲食店以外', JSON.stringify(old.segs));
     ok('古い保存の検索結果の表示は「全て」になる（2業種などの古い表示を出さない）', old.summary.includes('全て') && !old.summary.includes('業種'), old.summary.slice(0, 80));
     ok('古い保存の候補も、画面に出る（壊れない）', old.cards === 1, String(old.cards));
     ok('古いお気に入り条件が、一覧に出る', old.presets.includes('旧条件') && old.presets.includes('全て'), old.presets.slice(0, 60));
@@ -133,7 +133,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
         allInd: !!document.querySelector('#allInd') || !!root.querySelector('#allInd'),
       };
     });
-    ok('業種は3択：飲食店・飲食店以外・全て', ind.labels.join('/') === '飲食店/飲食店以外/全て', JSON.stringify(ind.labels));
+    ok('業種は3択：全て・飲食店・飲食店以外', ind.labels.join('/') === '全て/飲食店/飲食店以外', JSON.stringify(ind.labels));
     ok('細かい業種のチップと「全て」ボタンはない', ind.chips === 0 && !ind.allInd, JSON.stringify(ind));
 
     // 2) 飲食店を選んで検索 → 最初は20件まで（1ページ目だけ）

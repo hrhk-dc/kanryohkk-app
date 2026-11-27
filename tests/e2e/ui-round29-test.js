@@ -78,7 +78,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     ok('使い回したことが画面に出る', toasted, '');
 
     // 3) 条件（半径）を変える → 新しく検索する
-    await sr(() => document.getElementById('mlHost').shadowRoot.querySelector('[data-act="radius"][data-v="500m"]').click());
+    await sr(() => document.getElementById('mlHost').shadowRoot.querySelector('[data-act="radius"][data-v="2km"]').click());
     await wait(page, 300);
     await runSearch();
     ok('条件（半径）を変えたときは、新しく検索する', searches === 2, `searches=${searches}`);

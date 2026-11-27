@@ -1532,6 +1532,9 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
 }
 .menu-btn[aria-expanded="true"] .ic { color: var(--text); }
 .menu-btn:active { transform: scale(.94); }
+/* 指で動かせる（画面の端に吸着）。動かしている間は、アニメーションを止めて指に付いてくる */
+.menu-btn { touch-action: none; cursor: grab; }
+.menu-btn.dragging { transition: none; cursor: grabbing; box-shadow: 0 10px 22px -6px rgba(0, 0, 0, .85); }
 
 .menu-layer {
   position: fixed; inset: 0; z-index: 70;
@@ -1704,8 +1707,15 @@ body.mode-ml .ml-only { display: flex; }
 body.mode-ml .dc-only-menu { display: none !important; }
 
 /* Round 23（v78）：提案リストの並び替えは、上のバーの2段目（マップリストの提案リストを開いているときだけ） */
-.ml-sort-bar { display: none; flex: 0 0 100%; order: 3; gap: 6px; margin-top: 8px; flex-wrap: nowrap; }
-body.mode-ml.ml-proposal .ml-sort-bar { display: flex; }
+/* Round 31：並び替えは、上のバーの下に張り付く（隠れない）。上のバーが隠れたら、一番上に移る */
+.ml-sort-wrap {
+  display: none; position: sticky; top: 60px; z-index: 26; padding: 8px 16px;
+  background: var(--scrim); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  border-bottom: 1px solid var(--line); transition: top .45s ease-out;
+}
+body.mode-ml.ml-proposal .ml-sort-wrap { display: block; }
+.topbar.hide + .ml-sort-wrap { top: 0; }
+.ml-sort-bar { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: center; }
 .ml-sort-btn {
   height: 34px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px;
   background: linear-gradient(var(--tile), var(--tile)) padding-box, linear-gradient(var(--glass-line), var(--glass-line)) border-box;
