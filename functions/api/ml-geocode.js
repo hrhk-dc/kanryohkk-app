@@ -1,32 +1,36 @@
-// 住所・町名 → 座標（Cloudflare Pages Functions：POST /api/geocode）
+// 住所・町名 → 座標（Cloudflare Pages Functions：POST /api/ml-geocode）
+// データは OpenStreetMap（Nominatim）。Google は呼ばない。
 // ログイン不要。1つのIPからの連続した大量リクエストは回数制限で止める（1分に30回まで）。
-// 町名の範囲（viewport）も返す。
-import { keyOf, geocodeText, reverseText, placesErrorText } from "../../lib/vla-core.js";
+// 同じ住所・同じ場所は、その日（JST）のあいだ使い回す（Nominatim を呼び直さない）。
+import { geocodeOsm, reverseLabelOsm } from "../../lib/nominatim.js";
 import { hitLimit, clientIp, tooMany } from "../../lib/rate-limit.js";
+import { cachedSearch } from "../../lib/search-cache.js";
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 
-export async function onRequestPost({ request, env }) {
+// 同じ条件の保存の鍵（住所・座標ごと）
+const keyOf = (kind, parts) => `https://cache.local/nominatim/v1?kind=${kind}&k=${encodeURIComponent(JSON.stringify(parts))}`;
+
+export async function onRequestPost({ request }) {
   const lim = hitLimit(`geocode:${clientIp(request)}`, 30, 60_000);
   if (!lim.ok) return tooMany(lim.retryAfter);
-
-  const key = keyOf(env);
-  if (!key) return json({ ok: false, error: "住所の検索の設定がまだです（管理者がAPIキーを設定してください）" }, 503);
 
   let body;
   try { body = await request.json(); } catch { return json({ ok: false, error: "住所が正しくありません" }, 400); }
 
-  // 座標 → 付近の地名（現在地の表示に使う）。既存の検索と同じキー・同じ課金
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+
+  // 座標 → 付近の地名（現在地の表示に使う）
   if (body?.reverse) {
     const lat = Number(body.reverse.lat), lng = Number(body.reverse.lng);
     if (!(lat >= 20 && lat <= 46 && lng >= 122 && lng <= 154)) return json({ ok: false, error: "現在地が正しくありません" }, 400);
     try {
-      const label = await reverseText(key, lat, lng);
+      const { data: label } = await cachedSearch({ cache, key: keyOf("reverse", [lat.toFixed(4), lng.toFixed(4)]), run: () => reverseLabelOsm(lat, lng) });
       if (!label) return json({ ok: false, error: "付近の地名が見つかりませんでした" }, 404);
       return json({ ok: true, label });
     } catch (e) {
-      return json({ ok: false, error: placesErrorText(e, key, "付近の地名を取得できませんでした") }, 502);
+      return json({ ok: false, error: "付近の地名を取得できませんでした。時間をおいてもう一度お試しください" }, 502);
     }
   }
 
@@ -34,11 +38,10 @@ export async function onRequestPost({ request, env }) {
   if (!q) return json({ ok: false, error: "住所か町名を入力してください" }, 400);
 
   try {
-    const hit = await geocodeText(key, q);
+    const { data: hit } = await cachedSearch({ cache, key: keyOf("search", [q]), run: () => geocodeOsm(q) });
     if (!hit) return json({ ok: false, error: "場所が見つかりませんでした" }, 404);
     return json({ ok: true, ...hit });
   } catch (e) {
-    // 原因（キー・API未有効化・請求先など）が分かるように、理由を日本語のヒントで返す
-    return json({ ok: false, error: placesErrorText(e, key, "場所の検索に失敗しました。時間をおいてもう一度お試しください") }, 502);
+    return json({ ok: false, error: "場所の検索に失敗しました。時間をおいてもう一度お試しください" }, 502);
   }
 }
