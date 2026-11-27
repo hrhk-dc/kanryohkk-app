@@ -34,6 +34,12 @@
     <button id="undoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5L4.5 10.5l4 4"/><path d="M4.5 10.5h10a5 5 0 010 10H11"/></svg><span>元に戻す</span></button>
     <button id="redoBtn" class="hist-btn" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 6.5l4 4-4 4"/><path d="M19.5 10.5h-10a5 5 0 000 10H13"/></svg><span>やり直す</span></button>
   </div>
+  <!-- 提案リストの並び替え（マップリストの提案リストを開いているときだけ出す。上のバーと一緒に隠れる・出る） -->
+  <div id="mlSortBar" class="ml-sort-bar" role="group" aria-label="並び替え">
+    <button type="button" class="ml-sort-btn" data-ml-sort="rec">おすすめ順</button>
+    <button type="button" class="ml-sort-btn" data-ml-sort="dist">近い順</button>
+    <button type="button" class="ml-sort-btn" data-ml-sort="rating">評価順</button>
+  </div>
 </header>
 
 <!-- 右上の三本線メニュー（スクロールしても付いてくる。ヘッダーの外に置く） -->
@@ -479,9 +485,10 @@
         <h1>提案リスト</h1>
         <p class="summary" id="pSummary"></p>
       </header>
-      <div class="seg" id="pSort" role="tablist"></div>
-      <div class="seg two view-seg" id="pView" role="tablist"></div>
-      <div class="card"><h2 class="sec">業種で絞り込み</h2><div class="chips" id="pInd"></div></div>
+      <details class="card ind-fold" id="pIndFold">
+        <summary><span class="sec">業種で絞り込み</span><span class="ind-sum" id="pIndSum">全業種</span></summary>
+        <div class="chips" id="pInd"></div>
+      </details>
       <div class="card row-between">
         <span id="pOpenLabel"></span>
         <button class="switch" id="pOpen" role="switch" data-act="open-only" aria-checked="true"></button>
@@ -491,9 +498,8 @@
         <p class="sub">サイトなし・チェーン店除外済み</p>
       </div>
       <div id="pList"></div>
-      <div class="dock two">
-        <button class="btn" data-act="go-search">条件を変えてもう一度</button>
-        <button class="btn primary" data-act="go-list">訪問予定を見る</button>
+      <div class="dock">
+        <div class="seg two view-seg" id="pView" role="tablist"></div>
       </div>
     </section>
 
