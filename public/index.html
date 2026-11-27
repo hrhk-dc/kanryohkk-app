@@ -40,7 +40,6 @@
   <div id="mlSortBar" class="ml-sort-bar" role="group" aria-label="並び替え">
     <button type="button" class="ml-sort-btn" data-ml-sort="rec">おすすめ順</button>
     <button type="button" class="ml-sort-btn" data-ml-sort="dist">近い順</button>
-    <button type="button" class="ml-sort-btn" data-ml-sort="rating">評価順</button>
   </div>
 </div>
 
@@ -466,7 +465,7 @@
     <section class="screen" data-screen="search" aria-label="検索">
       <header class="hero">
         <h1>マップリスト</h1>
-        <p class="lead">ウェブサイトが載っていない店だけを、営業しやすさまで見ておすすめ順に並べます。（チェーン店は除外）</p>
+        <p class="lead">店の情報（営業時間・住所・業種・連絡先）が、どれだけそろっているかでおすすめ順に並べます。店の情報は OpenStreetMap から取っています。</p>
         <p class="demo-note" id="demoNote" hidden>表示中はサンプルデータです（API未接続）</p>
       </header>
 
@@ -497,7 +496,7 @@
       </div>
       <div class="list-head">
         <h2>提案リスト</h2>
-        <p class="sub">サイトなし・チェーン店除外済み</p>
+        <p class="sub">店の情報は OpenStreetMap から</p>
       </div>
       <div id="pList"></div>
       <div class="dock">

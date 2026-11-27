@@ -75,112 +75,80 @@
     set(k, v) { try { localStorage.setItem('vla:' + k, JSON.stringify(v)); } catch (e) { /* 保存できない端末では無視 */ } },
   };
 
-  // ---------- おすすめの点数（基準は暫定。バックエンド担当と確定させる） ----------
-  // 評価の4項目（同じ重み）。取れない項目は平均から外す（3点で埋めない）
-  const KEYS = ['rating', 'reviews', 'price', 'info'];
-  const W = { rating: 0.25, reviews: 0.25, price: 0.25, info: 0.25 };
-  const LABEL = { rating: '評価', reviews: '口コミ', price: '価格帯', info: '情報の充実度' };
+  // ---------- おすすめの点数（情報の充実度ベース。店の情報は OpenStreetMap から。評価・口コミ・価格帯は使わない） ----------
+  // 4つの項目（同じ重み25%）。ある＝5点、ない＝1点（ない項目を0点にはしない）
+  const KEYS = ['hours', 'address', 'industry', 'contact'];
+  const W = { hours: 0.25, address: 0.25, industry: 0.25, contact: 0.25 };
+  const LABEL = { hours: '営業時間', address: '住所', industry: '業種', contact: '連絡先' };
   const CRIT = {
-    rating: '4.5以上＝5点／4.0以上＝4点／3.5以上＝3点／3.0以上＝2点／それ未満＝1点',
-    reviews: '200件以上＝5点／100件以上＝4点／50件以上＝3点／10件以上＝2点／9件以下＝1点',
-    price: 'Googleの価格帯：無料・安い＝1〜2点／普通＝3点／高い＝4点／とても高い＝5点。価格帯が分からない店は平均に入れない',
-    info: '営業時間・住所・業種・評価のうち揃っている数に1を足す（4つすべてで5点）',
+    hours: '営業時間が1日分でも入っていれば5点、入っていなければ1点',
+    address: '住所が入っていれば5点、入っていなければ1点',
+    industry: '業種が入っていれば5点、入っていなければ1点',
+    contact: '電話番号・サイト・SNSのどれか1つでも入っていれば5点、どれも無ければ1点',
   };
   const WHY = {
-    rating: '口コミ評価が高く、店の信頼が見込める',
-    reviews: '口コミが多く、集客の実績がある',
-    price: '客単価が高い店ほど、営業先として有望と考えられる',
-    info: '情報が揃っている店は、事前に確認しやすく、訪問の準備がしやすい',
+    hours: '営業時間が分かると、訪問の時間を決めやすい',
+    address: '住所がはっきりしていると、場所を確かめて回りやすい',
+    industry: '業種が分かると、話の切り口を決めやすい',
+    contact: '連絡先があると、訪問の前に連絡や確認ができる',
   };
-  // Places の価格帯 → 点数（高いほど高得点）。分からないものは null
-  const PRICE_POINTS = { PRICE_LEVEL_FREE: 1, PRICE_LEVEL_INEXPENSIVE: 2, PRICE_LEVEL_MODERATE: 3, PRICE_LEVEL_EXPENSIVE: 4, PRICE_LEVEL_VERY_EXPENSIVE: 5 };
-  const PRICE_NAME = { 1: '無料・安い', 2: '安い', 3: '普通', 4: '高い', 5: 'とても高い' };
-
-  // 情報の充実度：営業時間・住所・業種・評価が揃っている数
-  function infoCount(s) {
-    const hasHours = Object.values(s.hours || {}).some((t) => typeof t === 'string' && t.trim() !== '');
-    return [hasHours, !!s.address, !!s.industry, s.rating > 0].filter(Boolean).length;
+  const has = (v) => (typeof v === 'string' ? v.trim() !== '' : !!v);
+  // 営業時間が1日分でも入っているか（データが無い店は「不明」。定休日とは区別する）
+  const hasHoursData = (s) => Object.values(s.hours || {}).some((t) => has(t));
+  function itemHas(s, k) {
+    if (k === 'hours') return hasHoursData(s);
+    if (k === 'address') return has(s.address);
+    if (k === 'industry') return has(s.industry);
+    return has(s.phone) || has(s.website) || has(s.insta);
   }
-
   function subScores(s) {
-    const pts = PRICE_POINTS[s.priceLevel];
-    return {
-      rating: s.rating >= 4.5 ? 5 : s.rating >= 4 ? 4 : s.rating >= 3.5 ? 3 : s.rating >= 3 ? 2 : 1,
-      reviews: s.reviews >= 200 ? 5 : s.reviews >= 100 ? 4 : s.reviews >= 50 ? 3 : s.reviews >= 10 ? 2 : 1,
-      price: pts == null ? null : pts,
-      info: 1 + infoCount(s),
-    };
+    return Object.fromEntries(KEYS.map((k) => [k, itemHas(s, k) ? 5 : 1]));
   }
-
+  // 根拠：取れている中身だけを書く（無い項目は「データはありません」とだけ）
   function evidence(s, k) {
-    if (k === 'rating') return `評価 ${s.rating}（5点満点）`;
-    if (k === 'reviews') return `口コミ ${s.reviews}件`;
-    if (k === 'price') return PRICE_POINTS[s.priceLevel] == null ? '価格帯は未取得' : `価格帯：${PRICE_NAME[PRICE_POINTS[s.priceLevel]]}`;
-    return `営業時間・住所・業種・評価のうち ${infoCount(s)} 件が揃っている`;
+    if (k === 'hours') return hasHoursData(s) ? '営業時間が曜日ごとに入っています' : '営業時間のデータはありません';
+    if (k === 'address') return has(s.address) ? `住所：${s.address}` : '住所のデータはありません';
+    if (k === 'industry') return has(s.industry) ? `業種：${s.industry}` : '業種のデータはありません';
+    const got = [has(s.phone) && '電話番号', has(s.website) && 'サイト', has(s.insta) && 'SNS'].filter(Boolean);
+    return got.length ? `連絡先：${got.join('・')}があります` : '連絡先のデータはありません';
   }
 
-  // 理由の文章（点数ごとに、シンプルな項目は短く、大事な項目は詳しく書く）
+  // 理由の文章：取れている情報だけで作る（無い情報は書かない。評価や口コミには触れない）
   function reasonDetail(s, k) {
-    const v = s.sub[k];
-    if (k === 'rating') {
-      if (v === 5) return `Googleの評価が${s.rating}と非常に高く、口コミ${s.reviews}件に支えられた信頼のあるお店です`;
-      if (v === 4) return `評価${s.rating}と高めで、初めての訪問でも話を聞いてもらいやすいお店です`;
-      if (v === 3) return `評価${s.rating}は平均的で、無理のない訪問先です`;
-      return `評価${s.rating}はやや低めです。訪問前に店の強みを確認してから回ると安心です`;
-    }
-    if (k === 'reviews') {
-      if (v === 5) return `口コミが${s.reviews}件と多く、地域で長く選ばれている実績があります`;
-      if (v === 4) return `口コミが${s.reviews}件あり、お客さんに選ばれている実績があります`;
-      if (v === 3) return `口コミは${s.reviews}件で、一定の実績があります`;
-      return `口コミは${s.reviews}件と少なめです`;
-    }
-    if (k === 'price') {
-      if (v >= 4) return `価格帯が${PRICE_NAME[v]}お店で、客単価が高く、営業先として見込みがあります`;
-      if (v === 3) return '価格帯は普通で、無理のない訪問先です';
-      return `価格帯は${PRICE_NAME[v]}お店です`;
-    }
-    // 情報の充実度
-    if (v === 5) return '営業時間・住所・業種・評価がすべて揃っていて、訪問前に確認しやすいお店です';
-    return `営業時間・住所・業種・評価のうち${v - 1}件が揃っています`;
+    if (k === 'hours') return '営業時間が分かっていて、訪問の時間を決めやすいお店です';
+    if (k === 'address') return '住所がはっきりしていて、場所を確かめやすいお店です';
+    if (k === 'industry') return `業種は「${s.industry}」で、話の切り口を決めやすいお店です`;
+    if (has(s.phone)) return '電話番号が分かっていて、訪問の前に連絡ができます';
+    if (has(s.website)) return 'サイトがあり、店の内容を訪問の前に確認できます';
+    return 'SNSで店の様子を、訪問の前に確認できます';
   }
 
-  // 理由は3〜5項目。点数4以上の項目を詳しく書く（足りないときは上位3つまで広げる）。
-  // 近い店（1km以内）には、移動の負担が少ないことも理由に足す。
+  // 理由は最大4つ。取れている項目を先に、次に近さ、最後に店の特徴（閉店の遅さ）
   function buildReasons(s, sub) {
-    const known = KEYS.filter((k) => sub[k] != null); // 取れた項目だけで理由を選ぶ
-    const ranked = known.slice().sort((a, b) => sub[b] - sub[a]);
-    let picked = ranked.filter((k) => sub[k] >= 4);
-    if (picked.length < 3) picked = ranked.slice(0, 3);
-    const list = picked.slice(0, 4).map((k) => reasonDetail({ ...s, sub }, k));
-    // 4つにそろえる：近い店（1km以内）の移動の話 → 店のデータから作る特徴（作れなければ、そのままの数）
+    const list = KEYS.filter((k) => sub[k] === 5).map((k) => reasonDetail(s, k));
     if (s.distance <= 1000 && list.length < 4) {
       const near = s.distance < 300 ? 'すぐ近くにあり' : `現在地から${fmtDist(s.distance)}と近く`;
       list.push(`${near}、移動の負担が少なく回れます`);
     }
     for (const f of featureFill(s)) { if (list.length >= 4) break; list.push(f); }
+    if (!list.length) list.push('地図の上で場所が分かっていて、下見がしやすいお店です');
     return list.slice(0, 4);
   }
 
-  // 店のデータから作る、その店らしい特徴（取れているものだけ。無いものは作らない）
+  // 店のデータから作る、その店らしい特徴（取れているものだけ）：閉店が遅いか
   function featureFill(s) {
     const out = [];
-    // 営業時間の閉店（「11:00〜21:00」の後ろの時刻）が遅いか
     const closes = Object.values(s.hours || {})
       .map((t) => (typeof t === 'string' ? (t.match(/〜\s*(\d{1,2})/) || [])[1] : null))
       .filter(Boolean).map(Number);
     const latest = closes.length ? Math.max(...closes) : null;
     if (latest != null && latest >= 21) out.push(`閉店が${latest}時と遅く、夜の時間帯にも訪問しやすいお店です`);
-    if (s.insta) out.push('SNSで店の情報を発信しています');
-    if (s.industry) out.push(`業種は「${s.industry}」のお店です`);
     return out;
   }
 
   function withScores(s) {
     const sub = subScores(s);
-    // 取れた項目だけで平均する（取れなかった項目は3で埋めず、平均に入れない）
-    const usable = KEYS.filter((k) => sub[k] != null);
-    const wSum = usable.reduce((a, k) => a + W[k], 0);
-    const total5 = usable.reduce((a, k) => a + sub[k] * W[k], 0) / wSum;
+    const total5 = KEYS.reduce((a, k) => a + sub[k] * W[k], 0);   // 4項目は必ずどれか（5か1）なので、平均はそのまま
     const overall = Math.round(total5 * 2 * 10) / 10;
     return { ...s, sub, total5, overall, reasons: buildReasons(s, sub) };
   }
@@ -188,7 +156,6 @@
   const SORTERS = {
     rec: (a, b) => b.overall - a.overall || a.distance - b.distance,
     dist: (a, b) => a.distance - b.distance,
-    rating: (a, b) => b.rating - a.rating || b.reviews - a.reviews,
   };
 
   // ---------- 状態 ----------
@@ -277,7 +244,8 @@
   const weekRange = (k) => { const d = addDays(today, k); return d; };
   const mapUrl = (s) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + s.address)}`;
   const fmtDist = (m) => (m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`);
-  const isOpenOn = (s, date) => !!s.hours[weekKey(date)];
+  // 営業時間のデータが無い店は「不明」として、営業中のフィルタで落とさない（定休日とは区別する）
+  const isOpenOn = (s, date) => !hasHoursData(s) || !!(s.hours || {})[weekKey(date)];
   const findIn = (list, id) => list.find((x) => x.id === id);
   const findShop = (id) => findIn(state.pool, id) || (findIn(state.visit, id) || {}).shop || (findIn(state.later, id) || {}).shop;
   const inVisit = (id) => state.visit.some((x) => x.id === id);
@@ -294,7 +262,7 @@
     const wk = date ? weekKey(date) : '';
     return `<div class="hours">${DAY_ORDER.map((i) => {
       const k = DAY_KEYS[i];
-      const h = s.hours[k];
+      const h = (s.hours || {})[k];
       return `<span class="hpill${h ? '' : ' closed'}${k === wk ? ' sel' : ''}"><b>${WD_JP[i]}</b>${h ? esc(h) : '定休日'}</span>`;
     }).join('')}</div>`;
   }
@@ -511,19 +479,17 @@
   }
 
   function overallDetail(s) {
-    const rows = KEYS.map((k) => (s.sub[k] == null
-      ? `<tr><td>${LABEL[k]}</td><td>未取得（平均に入れない）</td><td>—</td></tr>`
-      : `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`)).join('');
+    const rows = KEYS.map((k) => `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`).join('');
     return `<div class="detail"><p class="detail-title">点数の計算</p>
       <table class="calc">${rows}
         <tr class="sum"><td>合計（5点満点）</td><td></td><td>${s.total5.toFixed(2)}</td></tr>
         <tr class="sum"><td>10点満点にする</td><td>2倍</td><td>${s.overall.toFixed(1)}</td></tr>
       </table>
-      <p class="hint">4項目の重み：評価25%・口コミ25%・価格帯25%・情報の充実度25%。各項目は5点満点です。取れなかった項目は平均に入れず、取れた項目だけで割ります。</p></div>`;
+      <p class="hint">4項目の重み：営業時間・住所・業種・連絡先は各25%。ある項目は5点、ない項目は1点です（店の情報は OpenStreetMap から）。</p></div>`;
   }
 
   function scoreDetail(s, k) {
-    const score = s.sub[k] == null ? '未取得（平均に入れていません）' : `${s.sub[k]}点／5点`;
+    const score = `${s.sub[k]}点／5点`;
     return `<div class="detail"><p class="detail-title">${LABEL[k]}：${score}</p>
       <dl><dt>根拠</dt><dd>${esc(evidence(s, k))}</dd>
       <dt>理由</dt><dd>${esc(WHY[k])}</dd>
@@ -551,7 +517,7 @@
       <p class="meta">${ic('pin')}<span>${esc(s.address)}</span></p>
       <div class="meta-row">
         <span class="dist">${fmtDist(s.distance)}</span>
-        ${open ? `<span class="vtime">${esc(s.hours[weekKey(state.date)])}</span>` : '<span class="vtime closed">選択日は定休日</span>'}
+        ${!hasHoursData(s) ? '<span class="vtime">営業時間は不明</span>' : open ? `<span class="vtime">${esc((s.hours || {})[weekKey(state.date)])}</span>` : '<span class="vtime closed">選択日は定休日</span>'}
         ${s.insta ? `<a class="pill-btn" href="https://www.instagram.com/${esc(s.insta)}" target="_blank" rel="noopener">${ic('insta')}@${esc(s.insta)}</a>` : ''}
       </div>
       <div class="actions">
@@ -989,7 +955,7 @@
 
   // ---------- 地図で見る（店の位置を番号つきのピンで並べる） ----------
   const PIN = '123456789ABCDEFGHIJK'; // 番号（画面の並びと地図のピンが一致する）
-  const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順', rating: '評価順' };
+  const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順' };
   // ---------- 地図（対話式：Leaflet＋OpenStreetMap。店は番号つきのピン。自分の位置は青い点） ----------
   // 指で動かして拡大縮小できる。ピンか一覧の店を押すと、その店が選ばれる（ピン・一覧・店名を同じにそろえる）
   const MAP_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

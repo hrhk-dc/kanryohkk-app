@@ -2,7 +2,7 @@
  * maplist-app：データの受け口（VLA_DATA）
  *
  * 画面（app.js）はこの VLA_DATA の関数だけを呼ぶ。
- *  - 店舗検索・住所の座標変換：サーバー（/api/search・/api/geocode）が Google Places を使う。
+ *  - 店舗検索：サーバー（/api/ml-search）が OpenStreetMap の店データを返す（評価・口コミ・価格帯は無い）。住所の座標変換は /api/ml-geocode。
  *    APIキーはサーバーの環境変数 GOOGLE_MAPS_API_KEY にあり、ブラウザには出ない。
  *  - 訪問NG：完了報告アプリと同じ Firebase（dc-report-8e1d1）の vla_blocks に保存する。
  *  - ログインは完了報告アプリと同じ Googleログイン。許可は settings/members（メンバーだけ）。
@@ -141,9 +141,9 @@
   // ---------- 公開する関数 ----------
   window.VLA_DATA = {
     GROUPS,
-    isSample: false, // 本番のデータ（Google Places）
+    isSample: false, // 本番のデータ（OpenStreetMap）
 
-    // 店舗の候補を返す（ウェブサイトなし・チェーン除外・営業中のみ。近い順に最大50件）
+    // 店舗の候補を返す（近い順）。店の情報は name・lat/lng・address・industry・hours・phone/website/insta（ある場合だけ）
     //  center: {lat,lng}, radius: m, town: 町名まるごとか, viewport: 町名の範囲, industries: 業種名の配列（空＝全業種）
     // category: 'food'（飲食店）／'other'（飲食店以外）／'all'（両方）。page: 1から（1ページ20件）
     // 返す：{ shops（近い順）, hasMore（次のページがあるか） }
