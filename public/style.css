@@ -1518,7 +1518,9 @@ a.btn:active, .btn.primary:active, .btn.pill-plate:active, .visit-item .btn.prim
    6. 表示の条件：ログイン中だけ（body:not(.logged-in) で隠れる）。集計・管理はメニューでも管理者だけ（下のタブと同じ条件）。
       承認待ちの人はタブの項目を出さない（メニューの中身はリンク・名前・ログアウト・メール）。
    ================================================================ */
-.topbar { padding-right: max(64px, calc((100% - 724px) / 2)); }
+/* 三本線ボタンがヘッダーの右端にあるときだけ、右を空ける（ボタンの下に切り替えが重ならない）。
+   端へ動かしていれば空けず、切り替えは右端に寄る（app.js の menuPosApply が body.menu-in-header を付ける） */
+body.menu-in-header .topbar { padding-right: max(var(--menu-gutter, 64px), calc((100% - 724px) / 2)); }
 
 .menu-btn {
   position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 75;
