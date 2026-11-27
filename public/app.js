@@ -3068,7 +3068,20 @@ document.getElementById("mainNav")?.addEventListener("click", (e) => {
   window.mlActions.go(b.dataset.mlNav);
 });
 // マップリストの中で画面が変わったら（上のボタンなど）、下のタブの印も合わせる
-window.addEventListener("ml-screen", (e) => { if (curApp === "ml") setMlActive(e.detail); });
+window.addEventListener("ml-screen", (e) => {
+  // 提案リストを開いているときだけ、上のバーに並び替えを出す（body.ml-proposal。完了報告に戻れば隠れる）
+  document.body.classList.toggle("ml-proposal", e.detail === "proposal");
+  if (curApp === "ml") setMlActive(e.detail);
+});
+// 提案リストの並び順が変わったら、上のバーの印を合わせる
+window.addEventListener("ml-proposal", (e) => {
+  document.querySelectorAll("#mlSortBar [data-ml-sort]").forEach((b) => b.classList.toggle("on", b.dataset.mlSort === e.detail.sort));
+});
+// 上のバーの並び替えを押したら、マップリストの並び順を変える
+document.getElementById("mlSortBar")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ml-sort]");
+  if (b && window.mlActions && window.mlActions.sort) window.mlActions.sort(b.dataset.mlSort);
+});
 document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
   b.addEventListener("click", () => window.dcSwitchApp(b.dataset.app));
 });

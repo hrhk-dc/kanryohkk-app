@@ -176,6 +176,7 @@
     pSort: 'rec',
     pView: 'list',           // 提案の表示：一覧（list）か地図（map）
     pIndustries: new Set(),  // 提案画面の業種絞り込み（空＝全業種）
+    pIndOpen: false,         // 業種の一覧を開いているか（最初は閉じる）
     openOnly: true,
     expanded: new Set(),
     visit: [],                   // [{id, shop, visitDate}]。完了報告アプリの訪問リスト（visits）と同じもの（syncVisits で読む）
@@ -197,7 +198,7 @@
       area: state.area, radius: state.radius, count: state.count, date: state.date,
       industries: [...state.industries], indTab: state.indTab,
       pool: state.pool, snap: state.snap,
-      pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries],
+      pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries], pIndOpen: state.pIndOpen,
       openOnly: state.openOnly, expanded: [...state.expanded], listSort: state.listSort,
       screen: curScreen,
     });
@@ -218,6 +219,7 @@
     if (Object.prototype.hasOwnProperty.call(SORTERS, d.pSort)) state.pSort = d.pSort;
     if (d.pView === 'map' || d.pView === 'list') state.pView = d.pView;
     state.pIndustries = new Set(arr(d.pIndustries));
+    state.pIndOpen = d.pIndOpen === true;
     if (typeof d.openOnly === 'boolean') state.openOnly = d.openOnly;
     state.expanded = new Set(arr(d.expanded));
     if (typeof d.listSort === 'string') state.listSort = d.listSort;
@@ -456,9 +458,10 @@
 
   function renderProposal() {
     const sn = state.snap;
+    // 並び替えは、完了報告アプリの上のバーに出す（その並びの印を合わせる）
+    window.dispatchEvent(new CustomEvent('ml-proposal', { detail: { sort: state.pSort } }));
     if (!sn) {
       $('#pSummary').textContent = 'まだ提案がありません。';
-      $('#pSort').innerHTML = '';
       $('#pView').innerHTML = '';
       $('#pInd').innerHTML = '';
       $('#pOpenLabel').textContent = '';
@@ -466,14 +469,17 @@
       return;
     }
     $('#pSummary').textContent = `${sn.area}／半径 ${sn.radius}／${sn.count}件／訪問日 ${fmtDate(state.date)}／${sn.industry}`;
-    $('#pSort').innerHTML = [['rec', 'おすすめ順'], ['dist', '近い順'], ['rating', '評価順']].map(([k, l]) =>
-      `<button class="${state.pSort === k ? 'on' : ''}" data-act="p-sort" data-v="${k}">${l}</button>`).join('');
+    // 一覧／地図の切り替えは、画面の下のドックに出す
     $('#pView').innerHTML = [['list', '一覧'], ['map', '地図で見る']].map(([k, l]) =>
       `<button class="${state.pView === k ? 'on' : ''}" data-act="p-view" data-v="${k}">${l}</button>`).join('');
 
     const inds = [...new Set(state.pool.map((s) => s.industry))];
     $('#pInd').innerHTML = inds.map((n) => `<button class="chip${state.pIndustries.has(n) ? ' on' : ''}" data-act="p-ind" data-name="${esc(n)}">${esc(n)}</button>`).join('')
       || '<p class="hint">候補がありません</p>';
+    // 業種は折りたたみ。閉じているときも、選んだ業種が分かるように小さく出す
+    const picked = [...state.pIndustries];
+    $('#pIndSum').textContent = picked.length ? `${picked.slice(0, 2).join('・')}${picked.length > 2 ? ` ほか${picked.length - 2}件` : ''}` : '全業種';
+    $('#pIndFold').open = !!state.pIndOpen;
 
     $('#pOpenLabel').textContent = `${fmtDate(state.date)}営業している店のみ`;
     const sw = $('#pOpen');
@@ -1124,6 +1130,10 @@
     showScreen();
     // 操作のたびに、条件・候補・表示の状態を端末に保存する（再読み込みしても戻る）
     ['input', 'change', 'click'].forEach((ev) => root.addEventListener(ev, saveUiSoon));
+    // 業種の一覧を開いた・閉じたときも覚える（toggle は泡立たないので、捕まえる段階で受ける）
+    root.addEventListener('toggle', (e) => {
+      if (e.target && e.target.id === 'pIndFold') { state.pIndOpen = e.target.open; saveUiSoon(); }
+    }, true);
     if (restored === 'stale') toast('前の日の提案は消しました。もう一度検索してください');
     D.onVisitsChange(visitsChanged);
     D.onAuthChange(() => refreshUser());
@@ -1131,6 +1141,8 @@
     window.mlActions = {
       blockList: () => openBlockList(),
       presets: () => goPresets(),
+      // 完了報告アプリの上のバーから、提案リストの並び順を変える
+      sort: (v) => { if (Object.prototype.hasOwnProperty.call(SORTERS, v)) { state.pSort = v; saveUiSoon(); renderProposal(); } },
       go: (name) => go(name), // 下のタブ（完了報告アプリの棒）から画面を切り替える
     };
     await refreshUser(); // 画面は先に出し、ログイン状態は後から反映する
