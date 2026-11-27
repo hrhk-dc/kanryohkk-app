@@ -3026,7 +3026,8 @@ async function refreshAll() {
 function pullBlocked(target) {
   if (!document.body.classList.contains("logged-in") || $("#appView").classList.contains("hidden")) return true;
   if (window.scrollY > 0 || document.documentElement.scrollTop > 0) return true;
-  if (target && target.closest && target.closest("input, textarea, select, [contenteditable], dialog, .modal, .overlay, .lightbox")) return true;
+  // 三本線ボタン（動かせる）とメニューの上の操作は、引っ張って更新の対象にしない（ボタンのドラッグを更新と取り違えない）
+  if (target && target.closest && target.closest("input, textarea, select, [contenteditable], dialog, .modal, .overlay, .lightbox, .menu-btn, #menuLayer")) return true;
   return false;
 }
 document.addEventListener("touchstart", (e) => {
