@@ -145,12 +145,12 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     }
     ok('マップリスト：検索・提案・訪問予定・後で訪問のどこにも「完了報告へ」がない', Object.values(goDcCount).every((v) => v === false), JSON.stringify(goDcCount));
     await page.screenshot({ path: `${SHOTS}/r21-ml-later.png` });
-    ok('マップリストの三本線メニュー：訪問NG一覧・お気に入り条件は残る（マップリストの項目）', await page.evaluate(async () => {
+    ok('マップリストの三本線メニュー：訪問NG一覧は残る・お気に入り条件はない（Round 34）', await page.evaluate(async () => {
       document.getElementById('menuBtn').click();
       await new Promise((r) => setTimeout(r, 300));
       const labels = [...document.querySelectorAll('#menuMl .menu-item')].map((e) => e.textContent.trim());
       const aboutHidden = getComputedStyle(document.querySelector('#menuPanel [data-menu-tab="about"]')).display === 'none';
-      return labels.includes('訪問NG一覧') && labels.includes('お気に入り条件') && aboutHidden;
+      return labels.includes('訪問NG一覧') && !labels.includes('お気に入り条件') && aboutHidden;
     }));
     await page.keyboard.press('Escape'); await wait(page, 300);
 

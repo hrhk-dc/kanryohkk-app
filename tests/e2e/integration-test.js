@@ -181,7 +181,7 @@ const ok = (name, cond, extra = '') => results.push({ name, pass: !!cond, extra:
       return { labels, tabs: vis('#menuTabs'), history: vis('#menuHistory'), ml: vis('#menuMl') };
     });
     ok('三本線メニュー（マップリスト）：完了報告のタブ・元に戻す・やり直すは出ない', !menu.tabs && !menu.history, JSON.stringify(menu.labels));
-    ok('三本線メニュー（マップリスト）：訪問NG一覧・お気に入り条件が出る', menu.ml && menu.labels.includes('訪問NG一覧') && menu.labels.includes('お気に入り条件'), JSON.stringify(menu.labels));
+    ok('三本線メニュー（マップリスト）：訪問NG一覧が出る（お気に入り条件はない）', menu.ml && menu.labels.includes('訪問NG一覧') && !menu.labels.includes('お気に入り条件'), JSON.stringify(menu.labels));
     await page.keyboard.press('Escape'); await page.waitForTimeout(250);
 
     // 4) 検索 → 提案リスト（マップリストの画面の中で操作する）

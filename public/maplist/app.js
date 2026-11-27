@@ -36,13 +36,10 @@
     const m = km ? Number(km[1]) * 1000 : m0 ? Number(m0[1]) : 1000;
     return RADIUS.reduce((best, r) => (Math.abs(r[2] - m) < Math.abs(best[2] - m) ? r : best), RADIUS[0])[0];
   }
-  const COUNTS = [3, 5, 10, 15, 20];
   // 業種の選び方（簡易）：全て・飲食店・飲食店以外。検索の分類になる（API の category）
   const CATS = [['all', '全て'], ['food', '飲食店'], ['other', '飲食店以外']];
   const catLabel = (k) => (CATS.find(([c]) => c === k) || CATS[0])[1];
-  const PAGE_SIZE = 20;   // 1ページの件数（API と同じ）
   const MAX_PAGES = 3;    // 1分類あたり60件まで
-  const ITEM_H = 44;
   const REASONS_BLOCK = ['出禁', '廃業・閉店', 'ターゲット外'];
   const SCREENS = ['search', 'proposal', 'list', 'later'];
   const NAV = [['search', '検索', 'search'], ['proposal', '提案', 'target'], ['list', '訪問予定', 'list'], ['later', '後で訪問', 'later']];
@@ -199,14 +196,12 @@
   const state = {
     area: { mode: 'address', address: '', lat: null, lng: null },
     radius: '1km',
-    count: 5,
     date: addDays(today, 1), // 訪問する日（デフォルトは翌日・JST）
     category: 'all',         // 検索する分類：'food'（飲食店）／'other'（飲食店以外）／'all'（全て）
     searchArgs: null,        // 最後の検索の中身（追加で取るときに同じ条件で次のページを取る）
     nextPage: 1,             // 次に取るページ（1ページ20件）
     mapSel: null,            // 地図で選ばれている店の id（ピン・一覧・店名をそろえる）
     hasMore: false,          // まだ次のページがあるか（API の hasMore）
-    presets: LS.get('presets', []),
     user: null,              // ログイン中の利用者（{name}）。未ログインは null
     blocks: [],
     pool: [],                // 検索で取得した候補（おすすめ点つき）
@@ -224,7 +219,6 @@
     listSort: 'default',
     userPos: null,
   };
-  let pendingCount = 5;
   let dateCb = null;
 
   // ---------- 再読み込みしても消えないように（端末内。検索条件・提案の候補・表示の状態） ----------
@@ -235,7 +229,7 @@
   function saveUi() {
     LS.set(UI_KEY, {
       day: today, at: Date.now(),
-      area: state.area, radius: state.radius, count: state.count, date: state.date,
+      area: state.area, radius: state.radius, date: state.date,
       poolKey: state.poolKey, poolDay: state.poolDay,
       category: state.category, searchArgs: state.searchArgs, nextPage: state.nextPage, hasMore: state.hasMore,
       pool: state.pool, snap: state.snap,
@@ -260,7 +254,6 @@
     const arr = (v) => (Array.isArray(v) ? v : []);
     if (d.area && typeof d.area === 'object') state.area = { ...state.area, ...d.area };
     state.radius = radiusKey(d.radius);
-    if (Number.isFinite(d.count)) state.count = d.count;
     state.date = sameDay && d.date ? d.date : addDays(today, 1);
     state.category = CATS.some(([k]) => k === d.category) ? d.category : 'all';
     state.searchArgs = d.searchArgs || null;
@@ -453,10 +446,6 @@
       `<button class="${state.radius === k ? 'on' : ''}" data-act="radius" data-v="${k}">${l}</button>`).join('')}</div></div>`;
   }
 
-  function renderCount() {
-    $('#s-count').innerHTML = `<button class="pick" data-act="count-open"><b>${state.count}</b>件 ${ic('down')}</button>`;
-  }
-
   function renderDate() {
     const el = $('#s-date');
     el.innerHTML = `${calToggleHTML('search', state.date)}${quickDates(state.date, 'search-date')}${CAL_OPEN.search ? calHTML('search', state.date, 'search-date') : ''}`;
@@ -471,34 +460,13 @@
       <p class="hint">${hint}</p>`;
   }
 
-  // 条件の中身を一行で（一覧の説明文）
-  function presetSummary(p) {
-    const place = p.area && p.area.mode === 'gps' ? '現在地' : ((p.area && p.area.address) || '住所未入力');
-    const rad = RADIUS.find((r) => r[0] === radiusKey(p.radius));
-    return `${place}・${rad ? rad[1] : p.radius}・${p.count}件・${catLabel(p.category)}`;
-  }
-
-  function renderPresets() {
-    const rows = state.presets.map((p, i) => `
-      <li class="prow">
-        <button class="prow-main" data-act="preset-apply" data-i="${i}">
-          <b>${esc(p.name)}</b><small>${esc(presetSummary(p))}</small>
-        </button>
-        <button class="btn small danger" data-act="preset-del" data-i="${i}" aria-label="${esc(p.name)}を削除">${ic('x')}削除</button>
-      </li>`).join('');
-    $('#s-presets').innerHTML = `${rows
-      ? `<ul class="plist">${rows}</ul>`
-      : '<p class="hint">よく使う条件を、名前を付けて保存できます（例：渋谷・飲食店）</p>'}
-      <div class="stack-row"><button class="btn small" data-act="preset-save">今の条件に名前を付けて保存</button></div>`;
-  }
-
 
   // ---------- 提案リスト ----------
   function visibleList() {
     let list = state.pool.slice().sort(SORTERS[state.pSort]);
     if (state.pIndustries.size) list = list.filter((s) => state.pIndustries.has(s.industry));
     if (state.openOnly) list = list.filter((s) => isOpenOn(s, state.date));
-    return list.slice(0, state.count);
+    return list; // 件数の指定はなし。候補（1ページ目の20件・追加ぶんも含む）すべてから作る
   }
 
   function renderProposal() {
@@ -513,7 +481,7 @@
       $('#pList').innerHTML = `<div class="empty"><p>まだ提案がありません。</p><button class="btn primary" data-act="go-search">条件を決める</button></div>`;
       return;
     }
-    $('#pSummary').textContent = `${sn.area}／半径 ${sn.radius}／${sn.count}件／訪問日 ${fmtDate(state.date)}／${sn.industry}`;
+    $('#pSummary').textContent = `${sn.area}／半径 ${sn.radius}／候補 ${state.pool.length}件／訪問日 ${fmtDate(state.date)}／${sn.industry}`;
     // 一覧／地図の切り替えは、画面の下のドックに出す
     $('#pView').innerHTML = [['list', '一覧'], ['map', '地図で見る']].map(([k, l]) =>
       `<button class="${state.pView === k ? 'on' : ''}" data-act="p-view" data-v="${k}">${l}</button>`).join('');
@@ -714,7 +682,7 @@
   function renderAll() {
     renderAccount();
     requestAnimationFrame(markEdges);
-    renderArea(); renderRadius(); renderCount(); renderDate(); renderInd(); renderPresets();
+    renderArea(); renderRadius(); renderDate(); renderInd();
     renderProposal(); renderVisitList(); renderLaterList(); renderBadges();
   }
 
@@ -738,7 +706,7 @@
   }
 
   // ---------- 検索の実行 ----------
-  // 検索の条件（件数は含めない。件数だけ変えたときは、取れている候補の残りから作る）
+  // 検索の条件（件数は持たない。提案は取れている候補（1ページ目20件＋追加ぶん）から作る）
   function searchKey() {
     const a = state.area;
     return JSON.stringify({
@@ -758,7 +726,6 @@
     if (key === state.poolKey && state.poolDay === todayJst() && state.pool.length) {
       const blocked0 = new Set(state.blocks.map((b) => b.id));
       state.pool = state.pool.filter((s) => !blocked0.has(s.id));
-      state.snap = { ...state.snap, count: state.count };
       go('proposal');
       saveUiSoon();
       toast('保存してある候補から作りました（検索はしていません）');
@@ -792,7 +759,6 @@
       state.snap = {
         area: a.mode === 'address' ? a.address.trim() : '現在地',
         radius: RADIUS.find((r) => r[0] === state.radius)[1],
-        count: state.count,
         industry: catLabel(state.category),
       };
       state.pIndustries = new Set();   // 手元の候補を絞る業種は、検索のたびに全部に戻す
@@ -821,7 +787,6 @@
       state.pool = state.pool.concat(add);
       state.nextPage = page + 1;
       state.hasMore = hasMore && page < MAX_PAGES;
-      state.count = Math.min(state.pool.length, MAX_PAGES * PAGE_SIZE); // 追加ぶんも提案に出す
       renderProposal();
       saveUiSoon();
       toast(add.length ? `${add.length}件増えました` : '新しい候補はありませんでした');
@@ -877,29 +842,7 @@
     });
   }
 
-  // ---------- 数字選択（件数）・日付選択 ----------
-  function openCountWheel() {
-    pendingCount = state.count;
-    // 追加で取った候補の数（20より多い）も選べるように、今の件数を一覧に足す
-    const counts = [...new Set([...COUNTS, state.count])].sort((a, b) => a - b);
-    const sheetEl = openSheet('件数', `
-      <div class="wheel-wrap"><div class="wheel-hi"></div>
-        <div class="wheel" id="wheel">${counts.map((n) => `<div class="wi" data-act="wi" data-n="${n}">${n}件</div>`).join('')}</div>
-      </div>
-      <p class="hint">数字をスクロールして選び、「決める」を押してください。</p>
-      <div class="stack"><button class="btn primary wide" data-act="count-ok">決める</button></div>`);
-    const w = $('#wheel', sheetEl);
-    const idx = counts.indexOf(state.count);
-    w.scrollTop = idx * ITEM_H;
-    const mark = (i) => $$('.wi', w).forEach((el, j) => el.classList.toggle('on', j === i));
-    mark(idx);
-    w.addEventListener('scroll', () => {
-      const i = Math.min(Math.max(Math.round(w.scrollTop / ITEM_H), 0), counts.length - 1);
-      pendingCount = counts[i];
-      mark(i);
-    }, { passive: true });
-  }
-
+  // ---------- 日付選択 ----------
   function openDatePick(id, kind) {
     const it = findIn(kind === 'later' ? state.later : state.visit, id);
     if (!it) return;
@@ -1042,57 +985,6 @@
     toast('解除しました（次の検索から表示されます）');
     renderSearchBlocks();
     openBlockList();
-  }
-
-  // ---------- お気に入り条件 ----------
-  // いまの検索条件（保存する中身）
-  function currentConditions() {
-    return {
-      area: { mode: state.area.mode, address: state.area.address },
-      radius: state.radius, count: state.count, category: state.category,
-    };
-  }
-
-  // 名前を入力して保存（同じ名前は重ねて保存しない）
-  function savePreset() {
-    openSheet('条件に名前を付けて保存', `
-      <label class="field"><span class="sub">名前（例：渋谷・飲食店）</span>
-        <input id="presetName" type="text" maxlength="20" placeholder="渋谷・飲食店" autocomplete="off"></label>
-      <p class="hint">${esc(presetSummary(currentConditions()))}</p>
-      <div class="stack"><button class="btn primary wide" data-act="preset-save-ok">保存する</button></div>`);
-    setTimeout(() => { const i = $('#presetName'); if (i) i.focus(); }, 60);
-  }
-
-  function confirmSavePreset() {
-    const name = (($('#presetName') || {}).value || '').trim();
-    if (!name) return toast('名前を入力してください');
-    if (state.presets.some((p) => p.name === name)) return toast('同じ名前の条件があります。別の名前にしてください');
-    state.presets.push({ name, ...currentConditions() });
-    LS.set('presets', state.presets);
-    closeSheet();
-    renderPresets();
-    toast(`「${name}」を保存しました`);
-  }
-
-  function applyPreset(i) {
-    const p = state.presets[i];
-    if (!p) return;
-    state.area = { mode: p.area.mode, address: p.area.address, lat: null, lng: null };
-    state.radius = radiusKey(p.radius);
-    state.count = p.count;
-    state.category = CATS.some(([k]) => k === p.category) ? p.category : 'all';
-    renderAll();
-    toast(`「${p.name}」を反映しました`);
-  }
-
-  function deletePreset(i) {
-    const p = state.presets[i];
-    if (!p) return;
-    if (!window.confirm(`「${p.name}」を削除しますか？`)) return;
-    state.presets.splice(i, 1);
-    LS.set('presets', state.presets);
-    renderPresets();
-    toast('削除しました');
   }
 
   // ---------- 地図で見る（店の位置を番号つきのピンで並べる） ----------
@@ -1263,15 +1155,9 @@
   }
 
   // ---------- 固定ヘッダーのメニュー ----------
-  // メニューは完了報告アプリの三本線メニュー（右上）に出す。その中の「訪問NG一覧」「お気に入り条件」は
+  // メニューは完了報告アプリの三本線メニュー（右上）に出す。その中の「訪問NG一覧」は
   // 下の mlActions から呼ばれる。ここでは何もしない（旧・この画面の中のメニューは使わない）
   function closeMenu() {}
-
-  // お気に入り条件（検索画面の、お気に入りの場所へ移動する）
-  // メニューの「お気に入り条件」は、検索の画面を上から開くだけ（勝手に下へスクロールしない）
-  function goPresets() {
-    go('search');
-  }
 
   // 下のタブの出し入れ（ゆっくり隠れる・少し上に動かすと出る）は、完了報告アプリ側（app.js）が両方のモードで行う
 
@@ -1282,9 +1168,6 @@
     'area-mode': (el) => { state.area.mode = el.dataset.v; renderArea(); },
     gps: () => locate(() => renderArea()),
     radius: (el) => { state.radius = el.dataset.v; renderRadius(); },
-    'count-open': openCountWheel,
-    wi: (el) => { const w = $('#wheel'); if (w) w.scrollTo({ top: COUNTS.indexOf(Number(el.dataset.n)) * ITEM_H, behavior: 'smooth' }); },
-    'count-ok': () => { state.count = pendingCount; closeSheet(); renderCount(); renderProposal(); },
     'search-date': (el) => { state.date = el.dataset.date; CAL_OPEN.search = false; renderDate(); }, // 選んだら閉じる
     'cal-toggle': (el) => {
       const kind = el.dataset.kind;
@@ -1300,18 +1183,13 @@
     'go-dc': () => { if (window.dcSwitchApp) window.dcSwitchApp('dc'); }, // 完了報告の画面に戻る（同じ画面の中で切り替える）
     'menu-block': () => { closeMenu(); openBlockList(); },
     'login-from-sheet': () => { closeSheet(); login(); },
-    'menu-presets': () => { closeMenu(); goPresets(); },
     'menu-logout': () => { closeMenu(); logout(); },
     'menu-login': () => { closeMenu(); login(); },
     'p-view': (el) => { state.pView = el.dataset.v; renderProposal(); },
     'map-full': () => openFullMap(),
     'map-pick': (el) => selectShop(el.dataset.id, true),
-    'preset-save-ok': () => confirmSavePreset(),
     cat: (el) => { if (CATS.some(([k]) => k === el.dataset.v)) { state.category = el.dataset.v; renderInd(); } },
     'more-results': () => loadMore(),
-    'preset-save': savePreset,
-    'preset-apply': (el) => applyPreset(Number(el.dataset.i)),
-    'preset-del': (el) => deletePreset(Number(el.dataset.i)),
     'block-list': openBlockList,
     'run-search': runSearch,
     'go-search': () => go('search'),
@@ -1390,10 +1268,9 @@
     if (restored === 'stale') toast('前の日の提案は消しました。もう一度検索してください');
     D.onVisitsChange(visitsChanged);
     D.onAuthChange(() => refreshUser());
-    // 完了報告アプリの三本線メニューから呼ぶ（訪問NG一覧・お気に入り条件）
+    // 完了報告アプリの三本線メニューから呼ぶ（訪問NG一覧）
     window.mlActions = {
       blockList: () => openBlockList(),
-      presets: () => goPresets(),
       // 完了報告アプリの上のバーから、提案リストの並び順を変える
       sort: (v) => { if (Object.prototype.hasOwnProperty.call(SORTERS, v)) { state.pSort = v; saveUiSoon(); renderProposal(); } },
       go: (name) => go(name), // 下のタブ（完了報告アプリの棒）から画面を切り替える

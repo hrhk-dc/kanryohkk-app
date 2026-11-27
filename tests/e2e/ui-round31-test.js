@@ -72,7 +72,8 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     await wait(page, 1500);
     ok('地図は対話式（Leaflet の地図が出ている）', (await root()) === 'yes', '');
     const pins = await sr(() => document.getElementById('mlHost').shadowRoot.querySelectorAll('.lp-pin').length);
-    ok('店の番号ピンが、一覧と同じ数だけ並ぶ（5件）', pins === 5, String(pins));
+    const listN = await sr(() => document.getElementById('mlHost').shadowRoot.querySelectorAll('#pList ol.map-order li').length);
+    ok('店の番号ピンが、一覧と同じ数だけ並ぶ（件数の指定はなし・候補の数どおり）', pins === listN && pins > 0, `pins=${pins} list=${listN}`);
     ok('地図のタイルは OpenStreetMap から読んでいる', tiles > 0, String(tiles));
     ok('自分の位置の青い点は、まだ出ない（現在地を取っていない）', (await sr(() => document.getElementById('mlHost').shadowRoot.querySelectorAll('.lp-me').length)) === 0, '');
 
