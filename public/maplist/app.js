@@ -139,11 +139,27 @@
     let picked = ranked.filter((k) => sub[k] >= 4);
     if (picked.length < 3) picked = ranked.slice(0, 3);
     const list = picked.slice(0, 4).map((k) => reasonDetail({ ...s, sub }, k));
-    if (s.distance <= 1000 && list.length < 5) {
+    // 4つにそろえる：近い店（1km以内）の移動の話 → 店のデータから作る特徴（作れなければ、そのままの数）
+    if (s.distance <= 1000 && list.length < 4) {
       const near = s.distance < 300 ? 'すぐ近くにあり' : `現在地から${fmtDist(s.distance)}と近く`;
       list.push(`${near}、移動の負担が少なく回れます`);
     }
-    return list;
+    for (const f of featureFill(s)) { if (list.length >= 4) break; list.push(f); }
+    return list.slice(0, 4);
+  }
+
+  // 店のデータから作る、その店らしい特徴（取れているものだけ。無いものは作らない）
+  function featureFill(s) {
+    const out = [];
+    // 営業時間の閉店（「11:00〜21:00」の後ろの時刻）が遅いか
+    const closes = Object.values(s.hours || {})
+      .map((t) => (typeof t === 'string' ? (t.match(/〜\s*(\d{1,2})/) || [])[1] : null))
+      .filter(Boolean).map(Number);
+    const latest = closes.length ? Math.max(...closes) : null;
+    if (latest != null && latest >= 21) out.push(`閉店が${latest}時と遅く、夜の時間帯にも訪問しやすいお店です`);
+    if (s.insta) out.push('SNSで店の情報を発信しています');
+    if (s.industry) out.push(`業種は「${s.industry}」のお店です`);
+    return out;
   }
 
   function withScores(s) {
@@ -385,7 +401,16 @@
       ${a.mode === 'address'
         ? `<label class="field"><span class="sr">住所・町名</span><input id="addr" type="text" placeholder="例：〇〇区〇〇" value="${esc(a.address)}" autocomplete="off"></label>`
         : `<button class="btn wide" data-act="gps">${ic('gps')}${a.lat == null ? '現在地を取得する' : '現在地を取得済み（取り直す）'}</button>
-           <p class="hint">${a.lat == null ? '位置情報を許可すると、今いる場所の周りから探します。' : (a.place ? `${esc(a.place)}付近の周りから探します。` : '現在地の周りから探します。')}</p>`}`;
+           ${a.lat == null ? '<p class="hint">位置情報を許可すると、今いる場所の周りから探します。</p>' : hereHTML(a)}`}`;
+  }
+  // 取った現在地の住所（何県・何市・何町）を、ボタンの下にはっきり出す。調べ中・取れなかったときも分かるように
+  function hereHTML(a) {
+    const name = a.place ? esc(a.place) : (a.place === '' ? '住所は取れませんでした' : '住所を調べています…');
+    return `<div class="here" aria-live="polite">
+        <span class="here-label">${ic('gps')}今いる場所</span>
+        <strong class="here-name">${name}</strong>
+        <p class="hint">この場所の周りから探します。</p>
+      </div>`;
   }
 
   function renderRadius() {
@@ -738,15 +763,30 @@
       state.userPos = { lat: p.coords.latitude, lng: p.coords.longitude };
       renderArea();
       toast('現在地を取得しました');
-      // 付近の地名を取って、表示を差し替える。取れなければ「現在地の周りから探します。」のまま
-      const at = state.userPos;
-      D.placeName(at).then((name) => {
-        if (state.userPos !== at) return; // 取り直していたら、古い結果は捨てる
-        state.area.place = name;
-        renderArea();
-      }).catch(() => {});
+      saveUiSoon();
+      resolvePlace();
       if (done) done();
     }, () => toast('現在地を取得できませんでした'), { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+  }
+
+  // 現在地の住所（何県・何市・何町）を取る。取れたら表示して端末に保存する。取れなければ「取れませんでした」と出す
+  function resolvePlace() {
+    const at = { lat: state.area.lat, lng: state.area.lng };
+    if (at.lat == null) return;
+    const same = () => state.area.lat === at.lat && state.area.lng === at.lng; // 取り直していたら、古い結果は捨てる
+    state.area.place = null;
+    renderArea();
+    D.placeName(at).then((name) => {
+      if (!same()) return;
+      state.area.place = name || '';
+      renderArea();
+      saveUiSoon();
+    }).catch(() => {
+      if (!same()) return;
+      state.area.place = '';
+      renderArea();
+      saveUiSoon();
+    });
   }
 
   // ---------- 数字選択（件数）・日付選択 ----------
@@ -1125,6 +1165,11 @@
     const note = $('#demoNote');
     if (note) note.hidden = !D.isSample;
     const restored = restoreUi();
+    // 再読み込みしても、保存した現在地の位置と住所が戻る（住所が取れていなかったときは、もう一度取る）
+    if (state.area.lat != null) {
+      state.userPos = { lat: state.area.lat, lng: state.area.lng };
+      if (state.area.place == null) setTimeout(resolvePlace, 0);
+    }
     syncVisits();
     renderAll();
     showScreen();
