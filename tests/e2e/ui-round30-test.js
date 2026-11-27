@@ -36,7 +36,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
   page1.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('ERR_FAILED')) errors.push(m.text()); });
   page1.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page1.on('response', (r) => { if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + r.url()); });
-  await page1.route('**/*', (route) => {
+  const attach = (pg, log = calls) => pg.route('**/*', (route) => {
     const u = route.request().url();
     if (u.startsWith('https://www.gstatic.com/')) return route.fulfill({ status: 200, contentType: 'application/javascript', body: STUB });
     if (u.endsWith('/api/ml-geocode')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, lat: 35.66, lng: 139.7, label: 'テスト区', viewport: null }) });
@@ -44,7 +44,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
       let body = {};
       try { body = route.request().postDataJSON() || {}; } catch (e) { body = {}; }
       const p = Number(body.page) || 1;
-      calls.push({ page: p, category: body.category || null, hasIndustries: 'industries' in body });
+      log.push({ page: p, category: body.category || null, hasIndustries: 'industries' in body });
       const hasMore = p < 3;
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, shops: page(p), hasMore }) });
     }
@@ -52,6 +52,7 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     if (u.startsWith(BASE)) return route.fallback();
     return route.abort();
   });
+  await attach(page1);
   const sr = (fn, arg) => page1.evaluate(fn, arg);
   const cards = () => sr(() => [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#pList .shop')].map((c) => c.querySelector('.shop-name').textContent.trim()));
   const moreBtn = () => sr(() => { const b = document.getElementById('mlHost').shadowRoot.querySelector('[data-act="more-results"]'); return b ? 'enabled' : (document.getElementById('mlHost').shadowRoot.querySelector('#pList .more .btn:disabled') ? 'disabled' : 'none'); });
@@ -63,6 +64,61 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     await sr(() => document.getElementById('mlHost').shadowRoot.querySelector('[data-act="count-ok"]').click());
     await wait(page1, 500);
   };
+  // 古い形式の保存（業種を業種の名前の一覧で持っていた頃の、保存データとお気に入り条件）が残っていても、
+  // 画面は壊れず、お気に入り条件を使って検索できる（全て として読み替える）
+  {
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const oldLog = [];
+    const oldErrors = [];
+    const oldCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+    const oldPage = await oldCtx.newPage();
+    oldPage.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('ERR_FAILED')) oldErrors.push(m.text()); });
+    oldPage.on('pageerror', (e) => oldErrors.push('pageerror: ' + e.message));
+    await attach(oldPage, oldLog);
+    await oldPage.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
+    await oldPage.evaluate((t) => {
+      const DAYS = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((k) => [k, '11:00〜21:00']));
+      localStorage.setItem('vla:ui', JSON.stringify({
+        day: t, poolDay: t, poolKey: '{"mode":"address"}', at: Date.now(),
+        area: { mode: 'address', address: 'テスト区', lat: null, lng: null }, radius: '1km', count: 5, date: t,
+        industries: ['寿司・割烹', 'ラーメン・中華そば'], indTab: 2, pIndustries: ['寿司・割烹'],
+        pSort: 'rec', pView: 'list', openOnly: true, expanded: [], listSort: 'default', pIndOpen: false, screen: 'proposal',
+        snap: { area: 'テスト区', radius: '1km', count: 5, industry: '2業種' },
+        pool: [{ id: 'o1', name: '旧店', industry: '寿司・割烹', address: '東京都テスト区1-1', lat: 35.66, lng: 139.7, rating: 4.2, reviews: 50,
+          priceLevel: null, opened: null, staff: null, insta: '', visited: false, hours: DAYS, distance: 10,
+          sub: { rating: 4, reviews: 3, fresh: 3, fit: 3 }, total5: 3.5, overall: 7, reasons: ['評価が高い'] }],
+      }));
+      localStorage.setItem('vla:presets', JSON.stringify([{ name: '旧条件', area: { mode: 'address', address: 'テスト区' }, radius: '1km', count: 5, industries: ['寿司・割烹'] }]));
+    }, today);
+    await oldPage.reload({ waitUntil: 'domcontentloaded' });
+    await wait(oldPage, 1200);
+    await oldPage.click('.app-seg[data-app="ml"]'); await wait(oldPage, 1200);
+    const old = await oldPage.evaluate(() => {
+      const root = document.getElementById('mlHost').shadowRoot;
+      return {
+        segs: [...root.querySelectorAll('#s-ind .seg button')].map((b) => b.textContent.trim()),
+        summary: root.querySelector('#pSummary')?.textContent || '',
+        presets: root.querySelector('#s-presets')?.textContent || '',
+        cards: root.querySelectorAll('#pList .shop').length,
+      };
+    });
+    ok('古い保存があっても、業種は3択で表示される', old.segs.join('/') === '飲食店/飲食店以外/全て', JSON.stringify(old.segs));
+    ok('古い保存の検索結果の表示は「全て」になる（2業種などの古い表示を出さない）', old.summary.includes('全て') && !old.summary.includes('業種'), old.summary.slice(0, 80));
+    ok('古い保存の候補も、画面に出る（壊れない）', old.cards === 1, String(old.cards));
+    ok('古いお気に入り条件が、一覧に出る', old.presets.includes('旧条件') && old.presets.includes('全て'), old.presets.slice(0, 60));
+    // お気に入り条件（古い形式）を使って、検索できる
+    await oldPage.evaluate(() => document.getElementById('mlHost').shadowRoot.querySelector('[data-act="preset-apply"][data-i="0"]').click());
+    await wait(oldPage, 500);
+    await oldPage.evaluate(() => document.querySelector('#mainNav [data-ml-nav="search"]').click());
+    await wait(oldPage, 400);
+    await oldPage.evaluate(() => document.getElementById('mlHost').shadowRoot.querySelector('[data-act="run-search"]').click());
+    await wait(oldPage, 1000);
+    const oldCall = oldLog[oldLog.length - 1] || null;
+    ok('古いお気に入り条件から検索できる（分類は全て・業種の指定は送らない）', oldLog.length === 1 && oldCall && oldCall.category === 'all' && !oldCall.hasIndustries, JSON.stringify(oldLog));
+    ok('古い保存の画面でもコンソールエラーなし', oldErrors.length === 0, oldErrors.join(' | '));
+    await oldCtx.close();
+  }
+
   try {
     await page1.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
     await wait(page1, 1000);

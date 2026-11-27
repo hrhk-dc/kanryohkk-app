@@ -238,6 +238,13 @@
     });
   }
   function saveUiSoon() { clearTimeout(uiSaveTimer); uiSaveTimer = setTimeout(saveUi, 300); }
+  // 古い保存（業種を33業種の名前で持っていた頃）を、今の3択に読み替える。業種の名前は「全て」にする
+  function snapFromSaved(snap) {
+    if (!snap || typeof snap !== 'object') return null;
+    const labels = CATS.map(([, l]) => l);
+    return { ...snap, industry: labels.includes(snap.industry) ? snap.industry : '全て' };
+  }
+
   // 戻せたら true。前の日の候補があって消したときは 'stale' を返す
   function restoreUi() {
     const d = LS.get(UI_KEY, null);
@@ -262,7 +269,7 @@
     if (SCREENS.includes(d.screen)) curScreen = d.screen;
     state.poolKey = typeof d.poolKey === 'string' ? d.poolKey : null;
     state.poolDay = typeof d.poolDay === 'string' ? d.poolDay : null;
-    if (sameDay && arr(d.pool).length) { state.pool = d.pool; state.snap = d.snap || null; return 'restored'; }
+    if (sameDay && arr(d.pool).length) { state.pool = d.pool; state.snap = snapFromSaved(d.snap); return 'restored'; }
     return arr(d.pool).length ? 'stale' : 'restored';
   }
 
