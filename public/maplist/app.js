@@ -24,16 +24,22 @@
 
   // ---------- 定数 ----------
   const RADIUS = [
-    ['500m', '500m', 500],
     ['1km', '1km', 1000],
     ['2km', '2km', 2000],
     ['3km', '3km', 3000],
-    ['town', '町名まるごと', 1500], // 町名まるごとの実際の範囲はバックエンドで決める（仮の値）
+    ['5km', '5km', 5000],
   ];
+  // 保存されていた半径（今の選択肢に無いもの：4km・500m・町名まるごとなど）は、一番近い選択肢に丸める
+  function radiusKey(v) {
+    const km = /^(\d+(?:\.\d+)?)km$/.exec(String(v || ''));
+    const m0 = /^(\d+)m$/.exec(String(v || ''));
+    const m = km ? Number(km[1]) * 1000 : m0 ? Number(m0[1]) : 1000;
+    return RADIUS.reduce((best, r) => (Math.abs(r[2] - m) < Math.abs(best[2] - m) ? r : best), RADIUS[0])[0];
+  }
   const COUNTS = [3, 5, 10, 15, 20];
-  // 業種の選び方（簡易）：飲食店・飲食店以外・全て。検索の分類になる（API の category）
-  const CATS = [['food', '飲食店'], ['other', '飲食店以外'], ['all', '全て']];
-  const catLabel = (k) => (CATS.find(([c]) => c === k) || CATS[2])[1];
+  // 業種の選び方（簡易）：全て・飲食店・飲食店以外。検索の分類になる（API の category）
+  const CATS = [['all', '全て'], ['food', '飲食店'], ['other', '飲食店以外']];
+  const catLabel = (k) => (CATS.find(([c]) => c === k) || CATS[0])[1];
   const PAGE_SIZE = 20;   // 1ページの件数（API と同じ）
   const MAX_PAGES = 3;    // 1分類あたり60件まで
   const ITEM_H = 44;
@@ -198,6 +204,7 @@
     category: 'all',         // 検索する分類：'food'（飲食店）／'other'（飲食店以外）／'all'（全て）
     searchArgs: null,        // 最後の検索の中身（追加で取るときに同じ条件で次のページを取る）
     nextPage: 1,             // 次に取るページ（1ページ20件）
+    mapSel: null,            // 地図で選ばれている店の id（ピン・一覧・店名をそろえる）
     hasMore: false,          // まだ次のページがあるか（API の hasMore）
     presets: LS.get('presets', []),
     user: null,              // ログイン中の利用者（{name}）。未ログインは null
@@ -252,7 +259,7 @@
     const sameDay = d.day === today;
     const arr = (v) => (Array.isArray(v) ? v : []);
     if (d.area && typeof d.area === 'object') state.area = { ...state.area, ...d.area };
-    if (RADIUS.some((r) => r[0] === d.radius)) state.radius = d.radius;
+    state.radius = radiusKey(d.radius);
     if (Number.isFinite(d.count)) state.count = d.count;
     state.date = sameDay && d.date ? d.date : addDays(today, 1);
     state.category = CATS.some(([k]) => k === d.category) ? d.category : 'all';
@@ -467,7 +474,7 @@
   // 条件の中身を一行で（一覧の説明文）
   function presetSummary(p) {
     const place = p.area && p.area.mode === 'gps' ? '現在地' : ((p.area && p.area.address) || '住所未入力');
-    const rad = RADIUS.find((r) => r[0] === p.radius);
+    const rad = RADIUS.find((r) => r[0] === radiusKey(p.radius));
     return `${place}・${rad ? rad[1] : p.radius}・${p.count}件・${catLabel(p.category)}`;
   }
 
@@ -526,9 +533,10 @@
     const list = visibleList();
     if (state.pView === 'map') {
       $('#pList').innerHTML = mapPanelHTML(list) + moreHTML();
-      loadMap(list);
+      mountMap(list);
       return;
     }
+    dropInline();   // 一覧に戻すときは、地図を外す
     $('#pList').innerHTML = (list.length
       ? list.map((s, i) => proposalCard(s, i + 1)).join('')
       : `<div class="empty"><p>条件に合う店がありませんでした。</p><p class="hint">半径を広げるか、条件を変えてもう一度お試しください。</p></div>`) + moreHTML();
@@ -1070,7 +1078,7 @@
     const p = state.presets[i];
     if (!p) return;
     state.area = { mode: p.area.mode, address: p.area.address, lat: null, lng: null };
-    state.radius = p.radius;
+    state.radius = radiusKey(p.radius);
     state.count = p.count;
     state.category = CATS.some(([k]) => k === p.category) ? p.category : 'all';
     renderAll();
@@ -1090,274 +1098,168 @@
   // ---------- 地図で見る（店の位置を番号つきのピンで並べる） ----------
   const PIN = '123456789ABCDEFGHIJK'; // 番号（画面の並びと地図のピンが一致する）
   const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順', rating: '評価順' };
-  let mapKey = '';   // 直前に取得した地図の店の並び（同じなら取り直さない）
-  let mapCur = null;    // 今の地図：{ points, base（店が全部入る中心と拡大）, img（今見えている画像：x, y, zoom, url）}
-  let mapReq = 0;
+  // ---------- 地図（対話式：Leaflet＋OpenStreetMap。店は番号つきのピン。自分の位置は青い点） ----------
+  // 指で動かして拡大縮小できる。ピンか一覧の店を押すと、その店が選ばれる（ピン・一覧・店名を同じにそろえる）
+  const MAP_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const MAP_ATTR = '© OpenStreetMap contributors';
+  let leafletReady = null;
+  let inlineMap = null;          // 提案リストの中の地図
+  let fullMap = null;            // 全画面の地図（開いているときだけ）
+  const mapSets = new Set();     // 開いている地図（選んだ店を、どの地図にも出すため）
+
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (!leafletReady) {
+      leafletReady = new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = '/vendor/leaflet/leaflet.js';
+        s.onload = () => (window.L ? res(window.L) : rej(new Error('地図を読み込めませんでした')));
+        s.onerror = () => rej(new Error('地図を読み込めませんでした。時間をおいてもう一度お試しください'));
+        document.head.appendChild(s);
+      });
+    }
+    return leafletReady;
+  }
+  // 地図の見た目（Leaflet の css）は、この画面（シャドウ）の中だけに入れる（完了報告の画面には効かせない）
+  function ensureLeafletCss() {
+    if (root.querySelector('link[data-leaflet]')) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = '/vendor/leaflet/leaflet.css';
+    l.dataset.leaflet = '1';
+    root.appendChild(l);
+  }
+
+  function selText(list) {
+    const s = list.find((x) => x.id === state.mapSel);
+    return s ? `${esc(s.name)}　<small>${fmtDist(s.distance)}</small>` : '店のピンを押すと、ここに店名が出ます';
+  }
 
   function mapPanelHTML(list) {
     if (!list.length) return `<div class="empty"><p>条件に合う店がありませんでした。</p></div>`;
     return `<div class="map-card">
       <div class="map-box" id="mapBox"><p class="hint">地図を読み込んでいます…</p></div>
+      <div class="map-tools"><button class="pill-btn" data-act="map-full">${ic('ext')}全画面で見る</button></div>
+      <p class="map-sel" id="mapSel">${selText(list)}</p>
       <p class="hint">並び順は「${SORT_LABEL[state.pSort]}」です。番号の順に回ると効率的です。</p>
-      <ol class="map-order">${list.map((s, i) => `<li><span class="pin-no">${PIN[i]}</span><span class="map-name">${esc(s.name)}</span><small>${fmtDist(s.distance)}</small></li>`).join('')}</ol>
+      <ol class="map-order">${list.map((s, i) => `<li class="${state.mapSel === s.id ? 'on' : ''}" data-act="map-pick" data-id="${esc(s.id)}"><span class="pin-no">${PIN[i]}</span><span class="map-name">${esc(s.name)}</span><small>${fmtDist(s.distance)}</small></li>`).join('')}</ol>
     </div>`;
   }
 
-  // 世界の地図を 0〜1 の数字で扱う（ズームしても位置がずれない）
-  const MV_W = 640, MV_H = 440;   // 静止画の大きさ（論理px。scale=2 で、きれいな2倍の画像になる）
-  const MV_MAX_ZOOM = 19;
-  const nxOf = (lng) => (lng + 180) / 360;
-  const nyOf = (lat) => { const s = Math.sin((lat * Math.PI) / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
-  const latOf = (ny) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180) / Math.PI;
-  const lngOf = (nx) => nx * 360 - 180;
-  const worldPx = (z) => 256 * 2 ** z; // 拡大 z のときの、世界の1辺（論理px）
-  const latLngOf = (v) => ({ lat: latOf(v.y), lng: lngOf(v.x) });
-  // 店が全部、枠の中に入る中心と拡大を決める（ビューアの基準になる）
-  function fitView(points) {
-    const xs = points.map((p) => nxOf(p.lng)), ys = points.map((p) => nyOf(p.lat));
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    for (let z = 17; z >= 1; z--) {
-      const w = worldPx(z);
-      if ((x1 - x0) * w <= MV_W - 80 && (y1 - y0) * w <= MV_H - 80) return { x: cx, y: cy, zoom: z };
-    }
-    return { x: cx, y: cy, zoom: 1 };
-  }
-
-  async function loadMap(list) {
-    const points = list.map((s) => ({ lat: s.lat, lng: s.lng }));
-    const key = points.map((p) => `${p.lat},${p.lng}`).join('|');
-    const req = ++mapReq;
-    const show = () => {
-      const box = $('#mapBox');
-      if (box && mapCur) box.innerHTML = `<button class="map-open" type="button" data-act="map-open" aria-label="地図を大きく見る"><img class="map-img" src="${mapCur.img.url}" alt="店の位置の地図（番号は下の一覧と同じ）"></button>`;
-    };
-    if (key === mapKey && mapCur) return show(); // 同じ店なら取り直さない
-    try {
-      const base = fitView(points);
-      const blob = await D.mapImage(points, { center: latLngOf(base), zoom: base.zoom });
-      if (req !== mapReq) return; // 新しい表示があれば、この結果は捨てる
-      mvClose(); // 表示中のビューアは閉じてから、古い画像を捨てる
-      if (mapCur) URL.revokeObjectURL(mapCur.img.url);
-      mapCur = { points, base, img: { x: base.x, y: base.y, zoom: base.zoom, url: URL.createObjectURL(blob) } };
-      mapKey = key;
-      show();
-    } catch (e) {
-      if (req !== mapReq) return;
-      const box = $('#mapBox');
-      if (box) box.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
-    }
-  }
-
-  // ---------- 地図の画像ビューア（画像アプリのように、拡大・縮小・移動・閉じる） ----------
-  // 画面の中心を、世界の上の位置（vc）と拡大（zv）で持つ。画像は img（どの位置・拡大で取ったか）の分だけ伸ばして出す。
-  let mv = null;
-  const mvK0 = () => Math.min(mv.el.clientWidth / MV_W, mv.el.clientHeight / MV_H); // 画面px / 論理px（画面の幅か高さに入る大きさ）
-
-  function mvApply() {
-    if (!mv) return;
-    const k0 = mvK0(), w = worldPx(mv.zv) * k0;
-    const dx = (mv.img.x - mv.vc.x) * w, dy = (mv.img.y - mv.vc.y) * w;
-    const sc = k0 * 2 ** (mv.zv - mv.img.zoom);
-    if (mv.pic.getAttribute('src') !== mv.img.url) mv.pic.src = mv.img.url;
-    mv.pic.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(4)})`;
-    mv.zoomEl.textContent = `${Math.round(2 ** (mv.zv - mv.base.zoom) * 100)}%`;
-  }
-  // 画面の (px, py)（中心からの位置）の下にある場所を動かさずに拡大・縮小する
-  function mvZoomAt(nz, px, py) {
-    const z = Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, nz));
-    const k0 = mvK0(), w0 = worldPx(mv.zv) * k0, w1 = worldPx(z) * k0;
-    const under = { x: mv.vc.x + px / w0, y: mv.vc.y + py / w0 };
-    mv.zv = z;
-    mv.vc = { x: under.x - px / w1, y: under.y - py / w1 };
-    mvApply();
-  }
-  function mvPan(dx, dy) {
-    const w = worldPx(mv.zv) * mvK0();
-    mv.vc = { x: mv.vc.x - dx / w, y: mv.vc.y - dy / w };
-    mvApply();
-  }
-  // 今見えている画像では粗い（拡大しすぎ・中心がずれた）ときだけ、取り直す
-  function mvNeedFetch() {
-    if (Math.abs(mv.zv - mv.img.zoom) >= 0.5) return true;
-    if (mv.zv <= mv.base.zoom + 0.05) return false; // 元の大きさのままなら、取り直さない
-    const w = worldPx(mv.zv) * mvK0();
-    return Math.abs(mv.img.x - mv.vc.x) * w > 140 || Math.abs(mv.img.y - mv.vc.y) * w > 100;
-  }
-  function mvScheduleFetch() {
-    if (!mv) return;
-    clearTimeout(mv.timer);
-    if (mvNeedFetch()) mv.timer = setTimeout(mvFetch, 280);
-  }
-  function mvNote(text) { if (mv) mv.note.textContent = text; }
-  // 今の中心・拡大で、詳しい地図を取り直す（既存の /api/ml-map に中心と拡大を渡す）
-  function mvFetch() {
-    if (!mv) return;
-    const z = Math.round(Math.min(MV_MAX_ZOOM, Math.max(mv.base.zoom - 2, mv.zv)));
-    const c = { x: mv.vc.x, y: mv.vc.y };
-    const seq = ++mv.seq;
-    mvNote('詳しい地図を読み込んでいます…');
-    D.mapImage(mv.points, { center: latLngOf(c), zoom: z }).then((blob) => {
-      if (!mv || seq !== mv.seq) return; // 後から別の取り直しが始まっていれば、この結果は捨てる
-      const prev = mv.own;
-      mv.own = URL.createObjectURL(blob);
-      mv.img = { x: c.x, y: c.y, zoom: z, url: mv.own };
-      mvApply();
-      if (prev) URL.revokeObjectURL(prev);
-      mvNote('');
-    }).catch((e) => {
-      if (!mv || seq !== mv.seq) return;
-      mvNote((e && e.message) || '詳しい地図を取れませんでした。もう一度お試しください');
+  function pinIcon(L, label, id) {
+    return L.divIcon({
+      className: 'lp-wrap',
+      html: `<span class="lp-pin${state.mapSel === id ? ' on' : ''}">${label}</span>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
     });
   }
-  function mvReset() {
-    const prev = mv.own;
-    mv.own = null; mv.img = mv.baseImg; mv.seq++;
-    clearTimeout(mv.timer);
-    mv.zv = mv.base.zoom; mv.vc = { x: mv.base.x, y: mv.base.y };
-    mvApply();
-    if (prev) URL.revokeObjectURL(prev);
-    mvNote('');
-  }
-  function mvAnim(fn) {
-    mv.stage.classList.add('anim');
-    fn();
-    clearTimeout(mv.animT);
-    mv.animT = setTimeout(() => { if (mv) mv.stage.classList.remove('anim'); }, 240);
-  }
-  function mvCenterOf(e) {
-    const r = mv.el.getBoundingClientRect();
-    return { x: e.clientX - (r.left + r.width / 2), y: e.clientY - (r.top + r.height / 2) };
-  }
-  function mvPinchState() {
-    const [a, b] = [...mv.ptrs.values()];
-    const r = mv.el.getBoundingClientRect();
-    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2 - (r.left + r.width / 2), y: (a.y + b.y) / 2 - (r.top + r.height / 2) } };
-  }
-  function mvDown(e) {
-    if (!mv) return;
-    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    mv.stage.setPointerCapture(e.pointerId);
-    mv.stage.classList.remove('anim');
-    if (mv.ptrs.size === 1) {
-      mv.startY = e.clientY;
-      const now = Date.now();
-      // ダブルタップ：同じ場所を続けて押すと、そこを一段拡大する
-      if (mv.lastTap && now - mv.lastTap.t < 320 && Math.hypot(e.clientX - mv.lastTap.x, e.clientY - mv.lastTap.y) < 30) {
-        mv.lastTap = null;
-        const p = mvCenterOf(e);
-        mvAnim(() => mvZoomAt(mv.zv + 1, p.x, p.y));
-        mvScheduleFetch();
-      } else {
-        mv.lastTap = { t: now, x: e.clientX, y: e.clientY };
-      }
-    } else if (mv.ptrs.size === 2) {
-      mv.lastTap = null;
-      mv.pinch = mvPinchState();
-    }
-  }
-  function mvMove(e) {
-    if (!mv || !mv.ptrs.has(e.pointerId)) return;
-    const prev = mv.ptrs.get(e.pointerId);
-    mv.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (mv.ptrs.size === 1) {
-      if (mv.zv > mv.base.zoom + 0.05) {
-        // 拡大しているとき：ドラッグで移動
-        mv.stage.classList.add('drag');
-        mvPan(e.clientX - prev.x, e.clientY - prev.y);
-      } else {
-        // 元の大きさのとき：下へスワイプすると、閉じる途中の見た目になる
-        const dy = e.clientY - mv.startY;
-        if (dy > 0) {
-          mv.sheet.style.transform = `translateY(${dy}px)`;
-          mv.el.style.background = `rgba(5, 6, 9, ${Math.max(0.25, 0.96 - dy / 500).toFixed(2)})`;
-        }
-      }
-    } else if (mv.ptrs.size === 2 && mv.pinch) {
-      // 2本指：指の中心の移動と、指の開き・閉じで拡大・縮小（指の下の場所は動かない）
-      mv.stage.classList.add('drag');
-      const now = mvPinchState();
-      mvPan(now.mid.x - mv.pinch.mid.x, now.mid.y - mv.pinch.mid.y);
-      if (mv.pinch.dist > 0 && now.dist > 0) mvZoomAt(mv.zv + Math.log2(now.dist / mv.pinch.dist), now.mid.x, now.mid.y);
-      mv.pinch = now;
-    }
-  }
-  function mvUp(e) {
-    if (!mv || !mv.ptrs.has(e.pointerId)) return;
-    mv.ptrs.delete(e.pointerId);
-    if (mv.ptrs.size === 1) mv.pinch = null;
-    if (mv.ptrs.size !== 0) return;
-    mv.stage.classList.remove('drag');
-    const dy = e.clientY - mv.startY;
-    if (mv.zv <= mv.base.zoom + 0.05 && dy > 110) return mvClose();
-    mv.sheet.style.transform = '';
-    mv.el.style.background = '';
-    mvScheduleFetch();
-  }
-  function mvWheel(e) {
-    if (!mv) return;
-    e.preventDefault();
-    const p = mvCenterOf(e);
-    mvZoomAt(mv.zv - Math.sign(e.deltaY) * 0.5, p.x, p.y);
-    mvScheduleFetch();
-  }
-  function mvKey(e) { if (e.key === 'Escape') mvClose(); }
 
-  function openMapViewer() {
-    if (!mapCur || mv) return;
-    const el = document.createElement('div');
-    el.className = 'mv';
-    el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
-    el.setAttribute('aria-label', '地図（拡大して見られます）');
-    el.innerHTML = `<div class="mv-sheet">
-        <div class="mv-stage"><img class="mv-pic" alt="店の位置の地図（番号は一覧と同じ）" draggable="false"></div>
-        <div class="mv-top">
-          <span class="mv-title">店の位置</span>
-          <button type="button" class="mv-btn mv-close" aria-label="閉じる">${ic('x')}</button>
-        </div>
-        <div class="mv-bottom">
-          <p class="mv-hint">ピンチで拡大・縮小 ／ ダブルタップで拡大 ／ 下にスワイプで閉じる</p>
-          <div class="mv-tools">
-            <button type="button" class="mv-btn" data-mv="out" aria-label="縮小">${ic('minus')}</button>
-            <button type="button" class="mv-btn mv-wide" data-mv="reset">全体</button>
-            <button type="button" class="mv-btn" data-mv="in" aria-label="拡大">${ic('plus')}</button>
-            <span class="mv-zoom">100%</span>
-          </div>
-          <p class="mv-note" aria-live="polite"></p>
-        </div>
-      </div>`;
-    root.appendChild(el);
-    mv = {
-      el, sheet: el.querySelector('.mv-sheet'), stage: el.querySelector('.mv-stage'), pic: el.querySelector('.mv-pic'),
-      zoomEl: el.querySelector('.mv-zoom'), note: el.querySelector('.mv-note'),
-      points: mapCur.points, base: mapCur.base, baseImg: mapCur.img,
-      img: mapCur.img, own: null, zv: mapCur.base.zoom, vc: { x: mapCur.base.x, y: mapCur.base.y },
-      seq: 0, timer: null, animT: null, ptrs: new Map(), pinch: null, startY: 0, lastTap: null,
-    };
-    mv.stage.addEventListener('pointerdown', mvDown);
-    mv.stage.addEventListener('pointermove', mvMove);
-    mv.stage.addEventListener('pointerup', mvUp);
-    mv.stage.addEventListener('pointercancel', mvUp);
-    mv.stage.addEventListener('wheel', mvWheel, { passive: false });
-    el.querySelector('.mv-close').addEventListener('click', mvClose);
-    el.querySelectorAll('[data-mv]').forEach((b) => b.addEventListener('click', () => {
-      const k = b.dataset.mv;
-      if (k === 'reset') return mvAnim(mvReset);
-      mvAnim(() => mvZoomAt(mv.zv + (k === 'in' ? 1 : -1), 0, 0));
-      mvScheduleFetch();
-    }));
-    document.addEventListener('keydown', mvKey);
-    mvApply();
+  // 地図を作る：店の番号ピン・自分の位置（取得済みのときだけ）。全部が入るように広さを合わせる
+  function buildMap(el, list) {
+    const L = window.L;
+    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 3, maxZoom: 19 });
+    L.tileLayer(MAP_TILE, { maxZoom: 19, attribution: MAP_ATTR }).addTo(map);
+    const markers = new Map();
+    const pts = [];
+    list.forEach((s, i) => {
+      if (s.lat == null || s.lng == null) return;
+      const m = L.marker([s.lat, s.lng], { icon: pinIcon(L, PIN[i], s.id), keyboard: false, title: s.name }).addTo(map);
+      m.on('click', () => selectShop(s.id, false));
+      markers.set(s.id, m);
+      pts.push([s.lat, s.lng]);
+    });
+    if (state.area.lat != null && state.area.lng != null) {
+      L.marker([state.area.lat, state.area.lng], {
+        icon: L.divIcon({ className: 'lp-wrap', html: '<span class="lp-me" title="いまの位置"></span>', iconSize: [20, 20], iconAnchor: [10, 10] }),
+        interactive: false,
+        keyboard: false,
+      }).addTo(map);
+      pts.push([state.area.lat, state.area.lng]);
+    }
+    if (pts.length > 1) map.fitBounds(pts, { padding: [28, 28], maxZoom: 17 });
+    else if (pts.length === 1) map.setView(pts[0], 16);
+    else map.setView([35.68, 139.76], 12);
+    const entry = { map, markers };
+    mapSets.add(entry);
+    return entry;
   }
 
-  function mvClose() {
-    if (!mv) return;
-    clearTimeout(mv.timer); clearTimeout(mv.animT);
-    if (mv.own) URL.revokeObjectURL(mv.own);
-    document.removeEventListener('keydown', mvKey);
-    mv.el.remove();
-    mv = null;
+  function dropMap(entry) {
+    if (!entry) return;
+    mapSets.delete(entry);
+    entry.map.remove();
+    if (inlineMap === entry) inlineMap = null;
+  }
+
+  function dropInline() { if (inlineMap) dropMap(inlineMap); }
+
+  // 提案リストの中の地図を出す（画面が変わるまでに、読み込みが終わったときだけ）
+  async function mountMap(list) {
+    dropInline();
+    const el = $('#mapBox');
+    if (!el) return;
+    ensureLeafletCss();
+    try { await loadLeaflet(); } catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+    const box = $('#mapBox');
+    if (!box || state.pView !== 'map') return;
+    inlineMap = buildMap(box, list);
+    selectShop(state.mapSel, false);
+  }
+
+  // 店を選ぶ：ピン・一覧・下の店名を、同じにそろえる（pan=true なら、地図もその店へ動かす）
+  function selectShop(id, pan) {
+    state.mapSel = id || null;
+    mapSets.forEach((entry) => {
+      entry.markers.forEach((m, mid) => {
+        const el = m.getElement && m.getElement();
+        const pin = el && el.querySelector('.lp-pin');
+        if (pin) pin.classList.toggle('on', mid === state.mapSel);
+      });
+      if (pan && state.mapSel) {
+        const m = entry.markers.get(state.mapSel);
+        if (m) entry.map.panTo(m.getLatLng());
+      }
+    });
+    root.querySelectorAll('.map-order li').forEach((li) => li.classList.toggle('on', li.dataset.id === state.mapSel));
+    const sel = root.querySelector('#mapSel');
+    if (sel) {
+      const li = state.mapSel ? root.querySelector(`.map-order li[data-id="${CSS.escape(state.mapSel)}"]`) : null;
+      sel.textContent = li ? `${li.querySelector('.map-name').textContent}　${li.querySelector('small').textContent}` : '店のピンを押すと、ここに店名が出ます';
+    }
+  }
+
+  // 全画面の地図（指で動かして、拡大縮小。下の一覧と同じ番号・同じ店）
+  function openFullMap() {
+    if (fullMap) return;
+    const list = visibleList();
+    if (!list.length) return;
+    ensureLeafletCss();
+    loadLeaflet().then(() => {
+      if (fullMap) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'mapfull';
+      wrap.setAttribute('role', 'dialog');
+      wrap.setAttribute('aria-modal', 'true');
+      wrap.setAttribute('aria-label', '地図（全画面）');
+      wrap.innerHTML = `<div class="mapfull-map" id="mapFullBox"></div>
+        <div class="mapfull-top"><span class="mapfull-title">店の位置</span><button type="button" class="mapfull-x" aria-label="閉じる">${ic('x')}</button></div>
+        <p class="mapfull-hint">ピンを押すと、その店が選ばれます。指で動かして、拡大・縮小できます</p>`;
+      root.appendChild(wrap);
+      const entry = buildMap(wrap.querySelector('#mapFullBox'), list);
+      fullMap = { wrap, entry };
+      wrap.querySelector('.mapfull-x').addEventListener('click', closeFullMap);
+      document.addEventListener('keydown', fullKey);
+      selectShop(state.mapSel, false);
+    }).catch((e) => toast(e.message));
+  }
+  function fullKey(e) { if (e.key === 'Escape') closeFullMap(); }
+  function closeFullMap() {
+    if (!fullMap) return;
+    dropMap(fullMap.entry);
+    fullMap.wrap.remove();
+    document.removeEventListener('keydown', fullKey);
+    fullMap = null;
   }
 
   // ---------- 固定ヘッダーのメニュー ----------
@@ -1402,7 +1304,8 @@
     'menu-logout': () => { closeMenu(); logout(); },
     'menu-login': () => { closeMenu(); login(); },
     'p-view': (el) => { state.pView = el.dataset.v; renderProposal(); },
-    'map-open': () => openMapViewer(),
+    'map-full': () => openFullMap(),
+    'map-pick': (el) => selectShop(el.dataset.id, true),
     'preset-save-ok': () => confirmSavePreset(),
     cat: (el) => { if (CATS.some(([k]) => k === el.dataset.v)) { state.category = el.dataset.v; renderInd(); } },
     'more-results': () => loadMore(),

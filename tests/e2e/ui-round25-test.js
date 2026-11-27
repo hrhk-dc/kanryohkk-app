@@ -83,7 +83,12 @@ const wait = (page, ms) => page.waitForTimeout(ms);
     const counts = await sr(() => [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#pList .shop')].map((c) => c.querySelectorAll('.reasons li').length));
     ok('特徴の箇条書き：4つの店がある', counts.some((n) => n === 4), JSON.stringify(counts));
     ok('特徴の箇条書き：5つ以上の店はない（4つまで）', counts.every((n) => n <= 4), JSON.stringify(counts));
-    ok('特徴の箇条書き：データが少ない店は、無理に埋めない（3つ以下）', counts.some((n) => n <= 3), JSON.stringify(counts));
+    // 業種がない店には、業種の文を作らない（データが無いものは作らない）
+    const noInd = await sr(() => {
+      const card = [...document.getElementById('mlHost').shadowRoot.querySelectorAll('#pList .shop')].find((c) => c.querySelector('.shop-name').textContent.trim() === 'テスト定食店');
+      return card ? card.querySelector('.reasons').textContent : null;
+    });
+    ok('特徴の箇条書き：業種がない店に、業種の文は出ない（データが無いものは作らない）', noInd !== null && !noInd.includes('業種は「'), (noInd || 'no card').slice(0, 60));
     const sample = await sr(() => [...document.getElementById('mlHost').shadowRoot.querySelector('#pList .shop .reasons').querySelectorAll('li')].map((li) => li.textContent.trim()).join(' / '));
     ok('特徴の内容が、店のデータから作られている（空の文ではない）', sample.length > 10 && !/undefined|null/.test(sample), sample.slice(0, 120));
     await page.screenshot({ path: `${SHOTS}/r25-reasons.png` });

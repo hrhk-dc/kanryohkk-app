@@ -400,53 +400,52 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* ===== 提案：地図で見る ===== */
 .view-seg { margin-top: 12px; }
+/* 地図（対話式・Leaflet＋OpenStreetMap）。店は番号ピン（一覧の番号と同じ色）、自分の位置は青い点 */
 .map-card { margin-top: 12px; }
-.map-box {
-  min-height: 220px; display: grid; place-items: center; overflow: hidden;
-  border-radius: 22px; background: #0B0D12; border: 1px solid var(--line);
+.map-box { height: 320px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #0B0D12; position: relative; }
+.map-box > .hint { padding: 14px; text-align: center; }
+.map-box .leaflet-container { background: #0B0D12; font-family: inherit; }
+.map-box .leaflet-tile-pane { filter: brightness(.8) saturate(.85); }
+.leaflet-bar { border: 1px solid rgba(255, 255, 255, .18) !important; border-radius: 14px !important; overflow: hidden; box-shadow: none !important; }
+.leaflet-bar a { background: rgba(11, 13, 18, .9) !important; color: var(--text) !important; border-bottom: 1px solid rgba(255, 255, 255, .12) !important; width: 34px !important; height: 34px !important; line-height: 34px !important; }
+.leaflet-control-attribution { background: rgba(11, 13, 18, .72) !important; color: var(--muted) !important; font-size: 10px !important; }
+.leaflet-control-attribution a { color: var(--sub) !important; }
+.lp-wrap { background: none !important; border: 0 !important; }
+.lp-pin {
+  display: grid; place-items: center; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%;
+  background: #0B0D12; box-shadow: inset 0 0 0 2px #00B4D8, 0 0 10px rgba(0, 180, 216, .45);
+  color: #fff; font-size: 13px; font-weight: 700; line-height: 1; transition: transform .15s;
 }
-.map-img { display: block; width: 100%; height: auto; }
-/* 地図画像：タップすると、全画面の画像ビューアが開く */
-.map-open { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none; cursor: zoom-in; border-radius: 14px; overflow: hidden; -webkit-tap-highlight-color: transparent; }
-
-/* 画像ビューア（全画面）：ピンチ・ダブルタップ・ドラッグで拡大と移動。下へスワイプか × で閉じる */
-.mv { position: fixed; inset: 0; z-index: 90; background: rgba(5, 6, 9, .96); transition: background .15s; }
-.mv-sheet { position: absolute; inset: 0; }
-.mv-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
-.mv-pic {
-  position: absolute; left: 50%; top: 50%; width: 640px; height: 440px; margin: -220px 0 0 -320px;
-  max-width: none; transform-origin: 50% 50%; pointer-events: none; -webkit-user-drag: none; user-select: none;
-}
-.mv-stage.anim .mv-pic { transition: transform .22s ease-out; }
-.mv-stage.drag .mv-pic { transition: none; }
-.mv-sheet { transition: transform .2s ease-out; }
-.mv-top {
-  position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px;
+.lp-pin.on { transform: scale(1.2); box-shadow: inset 0 0 0 2px #7DD3FF, 0 0 14px rgba(125, 211, 255, .75); }
+.lp-me { display: block; width: 18px; height: 18px; border-radius: 50%; background: #3B82F6; box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(59, 130, 246, .35); }
+.map-tools { display: flex; justify-content: flex-end; margin-top: 10px; }
+.map-sel { margin: 12px 0 0; font-size: 15px; font-weight: 600; min-height: 22px; overflow-wrap: anywhere; }
+.map-sel small { font-weight: 400; color: var(--muted); }
+.map-order li.on { border-color: rgba(125, 211, 255, .6); box-shadow: 0 0 0 1px rgba(125, 211, 255, .25); }
+.map-order li.on .pin-no { box-shadow: inset 0 0 0 1.5px #7DD3FF, 0 0 10px rgba(125, 211, 255, .6); }
+/* 全画面の地図（指で動かして拡大縮小。× か Esc で閉じる） */
+.mapfull { position: fixed; inset: 0; z-index: 90; background: #0B0D12; }
+.mapfull-map { position: absolute; inset: 0; }
+.mapfull-top {
+  position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 1000;
   display: flex; align-items: center; justify-content: space-between; pointer-events: none;
 }
-.mv-title {
+.mapfull-title {
   padding: 8px 14px; border-radius: 999px; background: rgba(11, 13, 18, .86);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); font-size: 13px; font-weight: 600; color: var(--text);
 }
-.mv-btn {
-  pointer-events: auto; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 999px;
+.mapfull-x {
+  pointer-events: auto; width: 44px; height: 44px; border: 0; border-radius: 999px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(11, 13, 18, .86); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
-  color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: transform .12s ease-out;
+  background: rgba(11, 13, 18, .9); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); color: var(--text);
 }
-.mv-btn:active { transform: scale(.94); }
-.mv-btn .ic { width: 20px; height: 20px; margin: 0; color: var(--sub); stroke-width: 1.5; }
-.mv-btn.mv-wide { width: auto; padding: 0 16px; }
-.mv-bottom {
-  position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+.mapfull-x .ic { width: 20px; height: 20px; margin: 0; color: var(--sub); stroke-width: 1.5; }
+.mapfull-hint {
+  position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 1000;
+  margin: 0; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none;
 }
-.mv-tools { display: flex; align-items: center; gap: 10px; pointer-events: none; }
-.mv-tools .mv-btn { pointer-events: auto; }
-.mv-zoom { min-width: 56px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); }
-.mv-hint, .mv-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
-.mv-note:empty { display: none; }
+
+
 .map-order { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .map-order li {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;

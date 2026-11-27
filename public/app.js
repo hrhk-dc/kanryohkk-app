@@ -967,7 +967,81 @@ function setMenu(open) {
   document.querySelector("header.topbar")?.toggleAttribute("inert", open);
   document.querySelector("main")?.toggleAttribute("inert", open);
 }
-menuBtn.addEventListener("click", () => setMenu(!menuLayer.classList.contains("open")));
+menuBtn.addEventListener("click", () => {
+  if (menuBtn.dataset.justDragged) return; // 動かしたあとの離しは、メニューを開かない
+  setMenu(!menuLayer.classList.contains("open"));
+});
+
+/* 三本線ボタンは、指で動かして画面の端（上・下・左・右）にくっつける。位置は端末に保存（完了報告・マップリストで同じ） */
+const MENU_POS_KEY = "menuBtnPos";
+const MENU_EDGE_M = 8;   // 端からの距離（px）
+const MENU_SIZE = 44;    // ボタンの大きさ（px）
+function menuPosLoad() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MENU_POS_KEY) || "null");
+    return v && ["top", "bottom", "left", "right"].includes(v.edge) && Number.isFinite(v.pos) ? v : null;
+  } catch (e) { return null; }
+}
+function menuPosSave(v) {
+  try { localStorage.setItem(MENU_POS_KEY, JSON.stringify(v)); } catch (e) { /* 保存できない端末では無視 */ }
+}
+// 保存された端と位置で、ボタンを置く（保存がなければ右上のまま）
+function menuPosApply() {
+  const v = menuPosLoad();
+  const s = menuBtn.style;
+  s.top = ""; s.bottom = ""; s.left = ""; s.right = "";
+  if (!v) return;
+  const f = Math.min(Math.max(v.pos, 0), 1);
+  const alongX = Math.round(MENU_EDGE_M + f * (innerWidth - MENU_SIZE - 2 * MENU_EDGE_M));
+  const alongY = Math.round(MENU_EDGE_M + f * (innerHeight - MENU_SIZE - 2 * MENU_EDGE_M));
+  if (v.edge === "top") { s.top = `calc(${MENU_EDGE_M}px + env(safe-area-inset-top))`; s.left = `${alongX}px`; }
+  else if (v.edge === "bottom") { s.bottom = `calc(${MENU_EDGE_M}px + env(safe-area-inset-bottom))`; s.left = `${alongX}px`; }
+  else if (v.edge === "left") { s.left = `${MENU_EDGE_M}px`; s.top = `${alongY}px`; }
+  else { s.right = `${MENU_EDGE_M}px`; s.top = `${alongY}px`; }
+}
+let menuDrag = null;
+// 動かしている間は、画面全体で指を追う（ボタンの外へ速く出ても、離した所まで続ける）
+function menuDragUpEv(e) { menuDragEnd(e, false); }
+function menuDragCancelEv(e) { menuDragEnd(e, true); }
+menuBtn.addEventListener("pointerdown", (e) => {
+  if (e.button !== undefined && e.button !== 0) return;
+  menuDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  window.addEventListener("pointermove", menuDragMove);
+  window.addEventListener("pointerup", menuDragUpEv);
+  window.addEventListener("pointercancel", menuDragCancelEv);
+});
+function menuDragMove(e) {
+  if (!menuDrag || menuDrag.id !== e.pointerId) return;
+  if (!menuDrag.moved && Math.hypot(e.clientX - menuDrag.x, e.clientY - menuDrag.y) < 8) return;   // 少し動いたら、ドラッグ
+  menuDrag.moved = true;
+  menuBtn.setPointerCapture?.(e.pointerId);   // 速く動かしても、指の動きを離さない
+  menuBtn.classList.add("dragging");
+  const x = Math.min(Math.max(e.clientX - MENU_SIZE / 2, 0), innerWidth - MENU_SIZE);
+  const y = Math.min(Math.max(e.clientY - MENU_SIZE / 2, 0), innerHeight - MENU_SIZE);
+  menuBtn.style.top = `${Math.round(y)}px`; menuBtn.style.left = `${Math.round(x)}px`;
+  menuBtn.style.right = ""; menuBtn.style.bottom = "";
+}
+function menuDragEnd(e, cancel) {
+  if (!menuDrag || menuDrag.id !== e.pointerId) return;
+  const moved = menuDrag.moved;
+  menuDrag = null;
+  window.removeEventListener("pointermove", menuDragMove);
+  window.removeEventListener("pointerup", menuDragUpEv);
+  window.removeEventListener("pointercancel", menuDragCancelEv);
+  menuBtn.classList.remove("dragging");
+  if (!moved || cancel) { menuPosApply(); return; }
+  // 離した場所から、一番近い端を選ぶ（その端の上の位置は、離した場所に合わせる）
+  const cx = e.clientX, cy = e.clientY;
+  const dist = { top: cy, bottom: innerHeight - cy, left: cx, right: innerWidth - cx };
+  const edge = Object.keys(dist).reduce((a, k) => (dist[k] < dist[a] ? k : a), "top");
+  const pos = edge === "top" || edge === "bottom" ? cx / innerWidth : cy / innerHeight;
+  menuPosSave({ edge, pos: Math.min(Math.max(pos, 0), 1) });
+  menuPosApply();
+  menuBtn.dataset.justDragged = "1";
+  setTimeout(() => { delete menuBtn.dataset.justDragged; }, 300);
+}
+window.addEventListener("resize", menuPosApply);
+menuPosApply();
 $("#menuScrim").addEventListener("click", () => setMenu(false));
 // 外のアプリへのリンク（新しいタブで開く）をタップしたら、メニューを閉じる
 document.querySelectorAll("a.menu-item").forEach((a) => a.addEventListener("click", () => setMenu(false)));
