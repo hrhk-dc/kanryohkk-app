@@ -196,6 +196,8 @@
     user: null,              // ログイン中の利用者（{name}）。未ログインは null
     blocks: [],
     pool: [],                // 検索で取得した候補（おすすめ点つき）
+    poolKey: null,           // その候補を取った検索の条件（エリア・半径・業種・日付）
+    poolDay: null,           // その候補を取った日（JST）。前の日の候補は使い回さない
     snap: null,              // 検索時の条件（提案画面の要約用）
     pSort: 'rec',
     pView: 'list',           // 提案の表示：一覧（list）か地図（map）
@@ -220,6 +222,7 @@
     LS.set(UI_KEY, {
       day: today, at: Date.now(),
       area: state.area, radius: state.radius, count: state.count, date: state.date,
+      poolKey: state.poolKey, poolDay: state.poolDay,
       industries: [...state.industries], indTab: state.indTab,
       pool: state.pool, snap: state.snap,
       pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries], pIndOpen: state.pIndOpen,
@@ -248,6 +251,8 @@
     state.expanded = new Set(arr(d.expanded));
     if (typeof d.listSort === 'string') state.listSort = d.listSort;
     if (SCREENS.includes(d.screen)) curScreen = d.screen;
+    state.poolKey = typeof d.poolKey === 'string' ? d.poolKey : null;
+    state.poolDay = typeof d.poolDay === 'string' ? d.poolDay : null;
     if (sameDay && arr(d.pool).length) { state.pool = d.pool; state.snap = d.snap || null; return 'restored'; }
     return arr(d.pool).length ? 'stale' : 'restored';
   }
@@ -725,9 +730,32 @@
   }
 
   // ---------- 検索の実行 ----------
+  // 検索の条件（件数は含めない。件数だけ変えたときは、取れている候補の残りから作る）
+  function searchKey() {
+    const a = state.area;
+    return JSON.stringify({
+      mode: a.mode,
+      where: a.mode === 'address' ? a.address.trim() : [a.lat, a.lng],
+      radius: state.radius,
+      industries: [...state.industries].sort(),
+      date: state.date,
+    });
+  }
+
   async function runSearch() {
     const a = state.area;
     let center, viewport = null;
+    const key = searchKey();
+    // 同じ条件・同じ日なら、検索せず、保存してある候補から作る（再検索の回数を減らす）
+    if (key === state.poolKey && state.poolDay === todayJst() && state.pool.length) {
+      const blocked0 = new Set(state.blocks.map((b) => b.id));
+      state.pool = state.pool.filter((s) => !blocked0.has(s.id));
+      state.snap = { ...state.snap, count: state.count };
+      go('proposal');
+      saveUiSoon();
+      toast('保存してある候補から作りました（検索はしていません）');
+      return;
+    }
     const btn = $('[data-act="run-search"]');
     btn.disabled = true; btn.textContent = '探しています…';
     try {
@@ -746,6 +774,8 @@
       const raw = await D.searchShops({ center, radius: radiusM, town, viewport: town ? viewport : null, industries: [...state.industries] });
       const blocked = new Set(state.blocks.map((b) => b.id));
       state.pool = raw.filter((s) => !blocked.has(s.id)).map(withScores);
+      state.poolKey = key;
+      state.poolDay = todayJst();
       state.snap = {
         area: a.mode === 'address' ? a.address.trim() : '現在地',
         radius: RADIUS.find((r) => r[0] === state.radius)[1],
