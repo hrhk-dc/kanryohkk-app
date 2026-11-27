@@ -21,7 +21,6 @@
   const wdOf = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
   const weekKey = (s) => DAY_KEYS[wdOf(s)];
   const fmtDate = (s) => { const [, m, d] = s.split('-').map(Number); return `${m}月${d}日（${WD_JP[wdOf(s)]}）`; };
-  const NOW_YEAR = Number(todayJst().slice(0, 4));
 
   // ---------- 定数 ----------
   const RADIUS = [
@@ -69,38 +68,47 @@
   };
 
   // ---------- おすすめの点数（基準は暫定。バックエンド担当と確定させる） ----------
-  const KEYS = ['rating', 'reviews', 'fresh', 'fit'];
-  const W = { rating: 0.25, reviews: 0.25, fresh: 0.2, fit: 0.3 };
-  const LABEL = { rating: '評価', reviews: '口コミ', fresh: '新しさ', fit: '成約しやすさ' };
+  // 評価の4項目（同じ重み）。取れない項目は平均から外す（3点で埋めない）
+  const KEYS = ['rating', 'reviews', 'price', 'info'];
+  const W = { rating: 0.25, reviews: 0.25, price: 0.25, info: 0.25 };
+  const LABEL = { rating: '評価', reviews: '口コミ', price: '価格帯', info: '情報の充実度' };
   const CRIT = {
     rating: '4.5以上＝5点／4.0以上＝4点／3.5以上＝3点／3.0以上＝2点／それ未満＝1点',
     reviews: '200件以上＝5点／100件以上＝4点／50件以上＝3点／10件以上＝2点／9件以下＝1点',
-    fresh: '開業2年以内＝5点／5年以内＝4点／10年以内＝3点／20年以内＝2点／それ以上＝1点。開業年が分からない店は3点（中立）',
-    fit: '従業員5名以下＝5点／10名以下＝4点／30名以下＝3点／それ以上＝2点。従業員数が分からない店は3点（中立）',
+    price: 'Googleの価格帯：無料・安い＝1〜2点／普通＝3点／高い＝4点／とても高い＝5点。価格帯が分からない店は平均に入れない',
+    info: '営業時間・住所・業種・評価のうち揃っている数に1を足す（4つすべてで5点）',
   };
   const WHY = {
     rating: '口コミ評価が高く、店の信頼が見込める',
     reviews: '口コミが多く、集客の実績がある',
-    fresh: '新しく開業した店は、取引先を探している可能性が高い',
-    fit: '規模が小さく、オーナーが直接決めやすい',
+    price: '客単価が高い店ほど、営業先として有望と考えられる',
+    info: '情報が揃っている店は、事前に確認しやすく、訪問の準備がしやすい',
   };
+  // Places の価格帯 → 点数（高いほど高得点）。分からないものは null
+  const PRICE_POINTS = { PRICE_LEVEL_FREE: 1, PRICE_LEVEL_INEXPENSIVE: 2, PRICE_LEVEL_MODERATE: 3, PRICE_LEVEL_EXPENSIVE: 4, PRICE_LEVEL_VERY_EXPENSIVE: 5 };
+  const PRICE_NAME = { 1: '無料・安い', 2: '安い', 3: '普通', 4: '高い', 5: 'とても高い' };
+
+  // 情報の充実度：営業時間・住所・業種・評価が揃っている数
+  function infoCount(s) {
+    const hasHours = Object.values(s.hours || {}).some((t) => typeof t === 'string' && t.trim() !== '');
+    return [hasHours, !!s.address, !!s.industry, s.rating > 0].filter(Boolean).length;
+  }
 
   function subScores(s) {
-    const age = NOW_YEAR - s.opened;
+    const pts = PRICE_POINTS[s.priceLevel];
     return {
       rating: s.rating >= 4.5 ? 5 : s.rating >= 4 ? 4 : s.rating >= 3.5 ? 3 : s.rating >= 3 ? 2 : 1,
       reviews: s.reviews >= 200 ? 5 : s.reviews >= 100 ? 4 : s.reviews >= 50 ? 3 : s.reviews >= 10 ? 2 : 1,
-      // 開業年・従業員数は Google Places に無いので、分からない店は3点（中立）
-      fresh: s.opened == null ? null : age <= 2 ? 5 : age <= 5 ? 4 : age <= 10 ? 3 : age <= 20 ? 2 : 1,
-      fit: s.staff == null ? null : s.staff <= 5 ? 5 : s.staff <= 10 ? 4 : s.staff <= 30 ? 3 : 2,
+      price: pts == null ? null : pts,
+      info: 1 + infoCount(s),
     };
   }
 
   function evidence(s, k) {
     if (k === 'rating') return `評価 ${s.rating}（5点満点）`;
     if (k === 'reviews') return `口コミ ${s.reviews}件`;
-    if (k === 'fresh') return s.opened == null ? '開業年は未取得' : `開業 ${s.opened}年（${NOW_YEAR - s.opened}年目）`;
-    return s.staff == null ? '従業員数は未取得' : `従業員 ${s.staff}名`;
+    if (k === 'price') return PRICE_POINTS[s.priceLevel] == null ? '価格帯は未取得' : `価格帯：${PRICE_NAME[PRICE_POINTS[s.priceLevel]]}`;
+    return `営業時間・住所・業種・評価のうち ${infoCount(s)} 件が揃っている`;
   }
 
   // 理由の文章（点数ごとに、シンプルな項目は短く、大事な項目は詳しく書く）
@@ -118,24 +126,20 @@
       if (v === 3) return `口コミは${s.reviews}件で、一定の実績があります`;
       return `口コミは${s.reviews}件と少なめです`;
     }
-    if (k === 'fresh') {
-      const age = NOW_YEAR - s.opened;
-      if (v === 5) return `${s.opened}年開業（${age}年目）と新しく、新規の取引先やサービスを探している時期の可能性があります`;
-      if (v === 4) return `${s.opened}年開業（${age}年目）で比較的新しく、店の仕組みを見直している時期かもしれません`;
-      if (v === 3) return `${s.opened}年開業（${age}年目）で、経営が安定している時期です`;
-      return `${s.opened}年開業の歴史ある店で、取引先や仕入れが固まっていることが多いです`;
+    if (k === 'price') {
+      if (v >= 4) return `価格帯が${PRICE_NAME[v]}お店で、客単価が高く、営業先として見込みがあります`;
+      if (v === 3) return '価格帯は普通で、無理のない訪問先です';
+      return `価格帯は${PRICE_NAME[v]}お店です`;
     }
-    // 成約しやすさ（従業員数）
-    if (v === 5) return `従業員${s.staff}名の少人数で、オーナーが直接決めやすい規模です`;
-    if (v === 4) return `従業員${s.staff}名で、決裁する人に直接話が届きやすい規模です`;
-    if (v === 3) return `従業員${s.staff}名の中規模店で、担当者を通して話を進める形になります`;
-    return `従業員${s.staff}名の規模で、決裁に複数の人が関わる可能性があります`;
+    // 情報の充実度
+    if (v === 5) return '営業時間・住所・業種・評価がすべて揃っていて、訪問前に確認しやすいお店です';
+    return `営業時間・住所・業種・評価のうち${v - 1}件が揃っています`;
   }
 
   // 理由は3〜5項目。点数4以上の項目を詳しく書く（足りないときは上位3つまで広げる）。
   // 近い店（1km以内）には、移動の負担が少ないことも理由に足す。
   function buildReasons(s, sub) {
-    const known = KEYS.filter((k) => !(k === 'fresh' && s.opened == null) && !(k === 'fit' && s.staff == null));
+    const known = KEYS.filter((k) => sub[k] != null); // 取れた項目だけで理由を選ぶ
     const ranked = known.slice().sort((a, b) => sub[b] - sub[a]);
     let picked = ranked.filter((k) => sub[k] >= 4);
     if (picked.length < 3) picked = ranked.slice(0, 3);
@@ -539,7 +543,7 @@
         <tr class="sum"><td>合計（5点満点）</td><td></td><td>${s.total5.toFixed(2)}</td></tr>
         <tr class="sum"><td>10点満点にする</td><td>2倍</td><td>${s.overall.toFixed(1)}</td></tr>
       </table>
-      <p class="hint">4項目の重み：評価25%・口コミ25%・新しさ20%・成約しやすさ30%。各項目は5点満点です。取れなかった項目は平均に入れず、取れた項目だけで割ります。</p></div>`;
+      <p class="hint">4項目の重み：評価25%・口コミ25%・価格帯25%・情報の充実度25%。各項目は5点満点です。取れなかった項目は平均に入れず、取れた項目だけで割ります。</p></div>`;
   }
 
   function scoreDetail(s, k) {
