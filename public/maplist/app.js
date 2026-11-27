@@ -91,8 +91,8 @@
       rating: s.rating >= 4.5 ? 5 : s.rating >= 4 ? 4 : s.rating >= 3.5 ? 3 : s.rating >= 3 ? 2 : 1,
       reviews: s.reviews >= 200 ? 5 : s.reviews >= 100 ? 4 : s.reviews >= 50 ? 3 : s.reviews >= 10 ? 2 : 1,
       // 開業年・従業員数は Google Places に無いので、分からない店は3点（中立）
-      fresh: s.opened == null ? 3 : age <= 2 ? 5 : age <= 5 ? 4 : age <= 10 ? 3 : age <= 20 ? 2 : 1,
-      fit: s.staff == null ? 3 : s.staff <= 5 ? 5 : s.staff <= 10 ? 4 : s.staff <= 30 ? 3 : 2,
+      fresh: s.opened == null ? null : age <= 2 ? 5 : age <= 5 ? 4 : age <= 10 ? 3 : age <= 20 ? 2 : 1,
+      fit: s.staff == null ? null : s.staff <= 5 ? 5 : s.staff <= 10 ? 4 : s.staff <= 30 ? 3 : 2,
     };
   }
 
@@ -165,7 +165,10 @@
 
   function withScores(s) {
     const sub = subScores(s);
-    const total5 = KEYS.reduce((a, k) => a + sub[k] * W[k], 0);
+    // 取れた項目だけで平均する（取れなかった項目は3で埋めず、平均に入れない）
+    const usable = KEYS.filter((k) => sub[k] != null);
+    const wSum = usable.reduce((a, k) => a + W[k], 0);
+    const total5 = usable.reduce((a, k) => a + sub[k] * W[k], 0) / wSum;
     const overall = Math.round(total5 * 2 * 10) / 10;
     return { ...s, sub, total5, overall, reasons: buildReasons(s, sub) };
   }
@@ -523,17 +526,20 @@
   }
 
   function overallDetail(s) {
-    const rows = KEYS.map((k) => `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`).join('');
+    const rows = KEYS.map((k) => (s.sub[k] == null
+      ? `<tr><td>${LABEL[k]}</td><td>未取得（平均に入れない）</td><td>—</td></tr>`
+      : `<tr><td>${LABEL[k]}</td><td>${s.sub[k]}点・重み${Math.round(W[k] * 100)}%</td><td>${(s.sub[k] * W[k]).toFixed(2)}</td></tr>`)).join('');
     return `<div class="detail"><p class="detail-title">点数の計算</p>
       <table class="calc">${rows}
         <tr class="sum"><td>合計（5点満点）</td><td></td><td>${s.total5.toFixed(2)}</td></tr>
         <tr class="sum"><td>10点満点にする</td><td>2倍</td><td>${s.overall.toFixed(1)}</td></tr>
       </table>
-      <p class="hint">4項目の重み：評価25%・口コミ25%・新しさ20%・成約しやすさ30%。各項目は5点満点です。</p></div>`;
+      <p class="hint">4項目の重み：評価25%・口コミ25%・新しさ20%・成約しやすさ30%。各項目は5点満点です。取れなかった項目は平均に入れず、取れた項目だけで割ります。</p></div>`;
   }
 
   function scoreDetail(s, k) {
-    return `<div class="detail"><p class="detail-title">${LABEL[k]}：${s.sub[k]}点／5点</p>
+    const score = s.sub[k] == null ? '未取得（平均に入れていません）' : `${s.sub[k]}点／5点`;
+    return `<div class="detail"><p class="detail-title">${LABEL[k]}：${score}</p>
       <dl><dt>根拠</dt><dd>${esc(evidence(s, k))}</dd>
       <dt>理由</dt><dd>${esc(WHY[k])}</dd>
       <dt>点数の決め方（基準）</dt><dd>${esc(CRIT[k])}</dd></dl></div>`;
@@ -554,7 +560,7 @@
       </div>
       <h3 class="shop-name">${esc(s.name)}</h3>
       ${exp('overall') ? overallDetail(s) : ''}
-      <div class="scores">${KEYS.map((k) => `<button class="score${exp(k) ? ' open' : ''}" data-act="p-expand" data-id="${s.id}" data-k="${k}"><span>${LABEL[k]}</span><b>${s.sub[k]}</b><small>/5</small></button>`).join('')}</div>
+      <div class="scores">${KEYS.map((k) => `<button class="score${exp(k) ? ' open' : ''}" data-act="p-expand" data-id="${s.id}" data-k="${k}"><span>${LABEL[k]}</span><b>${s.sub[k] == null ? '—' : s.sub[k]}</b><small>/5</small></button>`).join('')}</div>
       ${KEYS.map((k) => (exp(k) ? scoreDetail(s, k) : '')).join('')}
       <ul class="reasons">${s.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
       <p class="meta">${ic('pin')}<span>${esc(s.address)}</span></p>
