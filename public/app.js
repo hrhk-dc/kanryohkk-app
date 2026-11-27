@@ -3082,6 +3082,10 @@ document.getElementById("mlSortBar")?.addEventListener("click", (e) => {
   const b = e.target.closest("[data-ml-sort]");
   if (b && window.mlActions && window.mlActions.sort) window.mlActions.sort(b.dataset.mlSort);
 });
+// 三本線メニューの一番上：もう一方のモードへ行く（メニューを閉じてから切り替える）
+document.querySelectorAll("[data-app-go]").forEach((b) => {
+  b.addEventListener("click", () => { setMenu(false); window.dcSwitchApp(b.dataset.appGo); });
+});
 document.querySelectorAll(".app-switch [data-app]").forEach((b) => {
   b.addEventListener("click", () => window.dcSwitchApp(b.dataset.app));
 });
