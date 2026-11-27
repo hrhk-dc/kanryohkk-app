@@ -194,6 +194,12 @@ button:disabled { opacity: .45; cursor: default; }
 .calc .sum td { font-weight: 700; }
 .reasons { margin: 10px 0 0; padding-left: 18px; color: var(--sub); font-size: 14px; }
 .reasons li { margin: 5px 0; line-height: 1.6; }
+/* 現在地の住所：ボタンの下に、はっきり出す（何県・何市・何町） */
+.here { margin: 10px 0 2px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px var(--line); }
+.here-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.here-label .ic { width: 14px; height: 14px; margin: 0; color: var(--sub); }
+.here-name { display: block; margin-top: 4px; font-size: 16px; font-weight: 700; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.here .hint { margin: 4px 0 0; }
 /* 店カードの上段：順位・業種を左に、総合おすすめ度を右上に */
 .shop-head { justify-content: flex-start; }
 .shop-head .overall { width: auto; min-height: 34px; padding: 0 14px; margin: 0 0 0 auto; gap: 3px; justify-content: center; }
