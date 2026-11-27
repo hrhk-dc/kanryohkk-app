@@ -6,6 +6,7 @@
 //     住所・電話番号・営業時間・業種・評価・ホームページも取得
 
 import { classifyIndustry } from "../../public/industry.js";
+import { cachedSearch, placeCacheKey } from "../../lib/search-cache.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36";
 const ALLOWED = /^(maps\.app\.goo\.gl|goo\.gl|(www\.)?google\.[a-z.]+|maps\.google\.[a-z.]+)$/i;
@@ -262,6 +263,7 @@ function mapPlace(p) {
 
 async function handle(req, env) {
   const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
+  const detailHits = []; // 店の詳細の使い回し（HIT／MISS）。応答の X-Cache に出す
   try {
     const link = new URL(req.url).searchParams.get("url") || "";
     let host = "";
@@ -281,8 +283,12 @@ async function handle(req, env) {
     if (key && (info.placeId || info.name || info.lat)) {
       try {
         // 店舗IDがあればそれで直接。なければ、見つかるまで ①リンクの検索語そのまま ②店名＋住所 ③店名だけ ④座標 の順に探す
+        // 同じ店の詳細は、その日（JST）のあいだ使い回す（Places を呼ばない）。失敗したものは保存しない
+        const cache = typeof caches !== "undefined" ? caches.default : null;
         let found = {};
-        if (info.placeId) found = await withRetry(() => placeDetails(key, info.placeId));
+        if (info.placeId) {
+          found = (await cachedSearch({ cache, key: placeCacheKey("id", info.placeId), run: () => withRetry(() => placeDetails(key, info.placeId)) }, detailHits)).data;
+        }
         if (!found.name) {
           const tries = [...new Set([
             info.rawQuery,
@@ -291,7 +297,7 @@ async function handle(req, env) {
             info.lat && info.lng ? `${info.lat},${info.lng}` : ""
           ].filter(Boolean))];
           for (const q of tries) {
-            found = await withRetry(() => placesLookup(key, q, info.lat, info.lng, info.cid));
+            found = (await cachedSearch({ cache, key: placeCacheKey("q", [q, info.lat, info.lng, info.cid]), run: () => withRetry(() => placesLookup(key, q, info.lat, info.lng, info.cid)) }, detailHits)).data;
             if (found.name) break;
           }
         }
@@ -358,6 +364,7 @@ async function handle(req, env) {
     const cidMsg = "このリンク（cid=…形式）は店舗を特定できません。Googleマップの「共有」→「リンクをコピー」で出るリンクを使ってください";
     const cidOnly = !!info.cidOnly;
     delete info.placeId; delete info.rawQuery; delete info.cid; delete info.cidOnly;
+    if (detailHits.length) headers["X-Cache"] = detailHits.join(",");
     return new Response(JSON.stringify({ ok: found, ...info, finalUrl, notes, error: found ? "" : (cidOnly ? cidMsg : blocked ? "Googleの確認画面に回されて読み取れませんでした。少し時間をおいてもう一度試してください" : "このリンクから店舗の情報を読み取れませんでした") }), { status: 200, headers });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: "読み取り中にエラーが起きました：" + e.message }), { status: 200, headers });
