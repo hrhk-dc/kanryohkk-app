@@ -31,6 +31,11 @@
     ['town', '町名まるごと', 1500], // 町名まるごとの実際の範囲はバックエンドで決める（仮の値）
   ];
   const COUNTS = [3, 5, 10, 15, 20];
+  // 業種の選び方（簡易）：飲食店・飲食店以外・全て。検索の分類になる（API の category）
+  const CATS = [['food', '飲食店'], ['other', '飲食店以外'], ['all', '全て']];
+  const catLabel = (k) => (CATS.find(([c]) => c === k) || CATS[2])[1];
+  const PAGE_SIZE = 20;   // 1ページの件数（API と同じ）
+  const MAX_PAGES = 3;    // 1分類あたり60件まで
   const ITEM_H = 44;
   const REASONS_BLOCK = ['出禁', '廃業・閉店', 'ターゲット外'];
   const SCREENS = ['search', 'proposal', 'list', 'later'];
@@ -190,8 +195,10 @@
     radius: '1km',
     count: 5,
     date: addDays(today, 1), // 訪問する日（デフォルトは翌日・JST）
-    industries: new Set(),   // 検索画面で選んだ業種（空＝全業種）
-    indTab: 0,
+    category: 'all',         // 検索する分類：'food'（飲食店）／'other'（飲食店以外）／'all'（全て）
+    searchArgs: null,        // 最後の検索の中身（追加で取るときに同じ条件で次のページを取る）
+    nextPage: 1,             // 次に取るページ（1ページ20件）
+    hasMore: false,          // まだ次のページがあるか（API の hasMore）
     presets: LS.get('presets', []),
     user: null,              // ログイン中の利用者（{name}）。未ログインは null
     blocks: [],
@@ -223,7 +230,7 @@
       day: today, at: Date.now(),
       area: state.area, radius: state.radius, count: state.count, date: state.date,
       poolKey: state.poolKey, poolDay: state.poolDay,
-      industries: [...state.industries], indTab: state.indTab,
+      category: state.category, searchArgs: state.searchArgs, nextPage: state.nextPage, hasMore: state.hasMore,
       pool: state.pool, snap: state.snap,
       pSort: state.pSort, pView: state.pView, pIndustries: [...state.pIndustries], pIndOpen: state.pIndOpen,
       openOnly: state.openOnly, expanded: [...state.expanded], listSort: state.listSort,
@@ -241,8 +248,10 @@
     if (RADIUS.some((r) => r[0] === d.radius)) state.radius = d.radius;
     if (Number.isFinite(d.count)) state.count = d.count;
     state.date = sameDay && d.date ? d.date : addDays(today, 1);
-    state.industries = new Set(arr(d.industries));
-    if (Number.isFinite(d.indTab)) state.indTab = d.indTab;
+    state.category = CATS.some(([k]) => k === d.category) ? d.category : 'all';
+    state.searchArgs = d.searchArgs || null;
+    state.nextPage = Number.isFinite(d.nextPage) ? d.nextPage : 1;
+    state.hasMore = d.hasMore === true;
     if (Object.prototype.hasOwnProperty.call(SORTERS, d.pSort)) state.pSort = d.pSort;
     if (d.pView === 'map' || d.pView === 'list') state.pView = d.pView;
     state.pIndustries = new Set(arr(d.pIndustries));
@@ -266,7 +275,6 @@
   const findShop = (id) => findIn(state.pool, id) || (findIn(state.visit, id) || {}).shop || (findIn(state.later, id) || {}).shop;
   const inVisit = (id) => state.visit.some((x) => x.id === id);
   const inLater = (id) => state.later.some((x) => x.id === id);
-  const industryLabel = (set) => (set.size ? `${set.size}業種` : '全業種');
 
   function distM(a, b) {
     const R = 6371000, rad = (x) => (x * Math.PI) / 180;
@@ -440,35 +448,20 @@
     el.innerHTML = `${calToggleHTML('search', state.date)}${quickDates(state.date, 'search-date')}${CAL_OPEN.search ? calHTML('search', state.date, 'search-date') : ''}`;
   }
 
+  // 業種は3択（飲食店・飲食店以外・全て）。細かい業種の選択はやめた
   function renderInd() {
-    const g = D.GROUPS[state.indTab];
-    const cnt = (gi) => D.GROUPS[gi].items.filter((n) => state.industries.has(n)).length;
-    const tabs = D.GROUPS.map((gr, i) => {
-      const c = cnt(i);
-      return `<button class="htab${i === state.indTab ? ' on' : ''}" data-act="ind-tab" data-i="${i}">${esc(gr.name)}${c ? `<span class="cnt">${c}</span>` : ''}</button>`;
-    }).join('');
-    const all = g.items.every((n) => state.industries.has(n));
-    // 「全て」：33業種すべてが選ばれていれば「解除」に切り替える
-    const everyIndustry = D.GROUPS.every((gr) => gr.items.every((n) => state.industries.has(n)));
-    const allBtn = $('#allInd');
-    if (allBtn) {
-      allBtn.textContent = everyIndustry ? '解除' : '全て';
-      allBtn.classList.toggle('on', everyIndustry);
-    }
+    const hint = { food: '飲食店だけを探します', other: '飲食店以外を探します', all: '飲食店と、それ以外の店を探します' }[state.category];
     $('#s-ind').innerHTML = `
-      <div class="hwrap"><div class="htabs hscroll" role="tablist">${tabs}</div></div>
-      <div class="ind-head"><span class="sub">${esc(g.name)}（${g.items.length}業種）</span>
-        <button class="pill-btn${all ? ' on' : ''}" data-act="ind-group">${all ? 'まるごと解除' : 'まるごと選択'}</button></div>
-      <div class="chips">${g.items.map((n) => `<button class="chip${state.industries.has(n) ? ' on' : ''}" data-act="ind" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>
-      <p class="hint">${state.industries.size ? `選択中 ${state.industries.size}業種` : '未選択なら全業種が対象です'}</p>`;
+      <div class="seg three" role="tablist">${CATS.map(([k, l]) =>
+        `<button class="${state.category === k ? 'on' : ''}" data-act="cat" data-v="${k}" role="tab" aria-selected="${state.category === k}">${l}</button>`).join('')}</div>
+      <p class="hint">${hint}</p>`;
   }
 
   // 条件の中身を一行で（一覧の説明文）
   function presetSummary(p) {
     const place = p.area && p.area.mode === 'gps' ? '現在地' : ((p.area && p.area.address) || '住所未入力');
     const rad = RADIUS.find((r) => r[0] === p.radius);
-    const inds = (p.industries || []).length ? `${p.industries.length}業種` : '全業種';
-    return `${place}・${rad ? rad[1] : p.radius}・${p.count}件・${inds}`;
+    return `${place}・${rad ? rad[1] : p.radius}・${p.count}件・${catLabel(p.category)}`;
   }
 
   function renderPresets() {
@@ -525,13 +518,13 @@
 
     const list = visibleList();
     if (state.pView === 'map') {
-      $('#pList').innerHTML = mapPanelHTML(list);
+      $('#pList').innerHTML = mapPanelHTML(list) + moreHTML();
       loadMap(list);
       return;
     }
-    $('#pList').innerHTML = list.length
+    $('#pList').innerHTML = (list.length
       ? list.map((s, i) => proposalCard(s, i + 1)).join('')
-      : `<div class="empty"><p>条件に合う店がありませんでした。</p><p class="hint">半径を広げるか、条件を変えてもう一度お試しください。</p></div>`;
+      : `<div class="empty"><p>条件に合う店がありませんでした。</p><p class="hint">半径を広げるか、条件を変えてもう一度お試しください。</p></div>`) + moreHTML();
   }
 
   function overallDetail(s) {
@@ -737,7 +730,7 @@
       mode: a.mode,
       where: a.mode === 'address' ? a.address.trim() : [a.lat, a.lng],
       radius: state.radius,
-      industries: [...state.industries].sort(),
+      category: state.category,
       date: state.date,
     });
   }
@@ -771,18 +764,23 @@
       }
       const town = state.radius === 'town';
       const radiusM = RADIUS.find((r) => r[0] === state.radius)[2];
-      const raw = await D.searchShops({ center, radius: radiusM, town, viewport: town ? viewport : null, industries: [...state.industries] });
+      // 最初は1ページ目（20件）だけ。次のページは「追加で20件を見る」で取る
+      const args = { center, radius: radiusM, town, viewport: town ? viewport : null, category: state.category };
+      const { shops: raw, hasMore } = await D.searchShops({ ...args, page: 1 });
       const blocked = new Set(state.blocks.map((b) => b.id));
       state.pool = raw.filter((s) => !blocked.has(s.id)).map(withScores);
+      state.searchArgs = args;
+      state.nextPage = 2;
+      state.hasMore = hasMore && 1 < MAX_PAGES;
       state.poolKey = key;
       state.poolDay = todayJst();
       state.snap = {
         area: a.mode === 'address' ? a.address.trim() : '現在地',
         radius: RADIUS.find((r) => r[0] === state.radius)[1],
         count: state.count,
-        industry: industryLabel(state.industries),
+        industry: catLabel(state.category),
       };
-      state.pIndustries = new Set(state.industries);
+      state.pIndustries = new Set();   // 手元の候補を絞る業種は、検索のたびに全部に戻す
       state.openOnly = true;
       state.expanded = new Set();
       go('proposal');
@@ -792,6 +790,40 @@
     } finally {
       btn.disabled = false; btn.textContent = '提案リストを作る';
     }
+  }
+
+  // 「追加で20件を見る」：同じ条件で次のページを取り、候補と提案に足す（自動では取りに行かない）
+  async function loadMore() {
+    if (!state.hasMore || !state.searchArgs || !state.pool.length) return;
+    const page = state.nextPage;
+    const btn = $('[data-act="more-results"]');
+    if (btn) { btn.disabled = true; btn.textContent = '取りに行っています…'; }
+    try {
+      const { shops, hasMore } = await D.searchShops({ ...state.searchArgs, page });
+      const blocked = new Set(state.blocks.map((b) => b.id));
+      const have = new Set(state.pool.map((s) => s.id));
+      const add = shops.filter((s) => !blocked.has(s.id) && !have.has(s.id)).map(withScores);
+      state.pool = state.pool.concat(add);
+      state.nextPage = page + 1;
+      state.hasMore = hasMore && page < MAX_PAGES;
+      state.count = Math.min(state.pool.length, MAX_PAGES * PAGE_SIZE); // 追加ぶんも提案に出す
+      renderProposal();
+      saveUiSoon();
+      toast(add.length ? `${add.length}件増えました` : '新しい候補はありませんでした');
+    } catch (e) {
+      renderProposal();
+      toast((e && e.message) || '追加で取れませんでした。もう一度お試しください');
+    }
+  }
+
+  // 提案リストの下の「追加で20件を見る」（次がないときは押せない表示）
+  function moreHTML() {
+    if (!state.searchArgs || !state.pool.length) return '';
+    return state.hasMore
+      ? `<div class="more"><button class="btn wide" data-act="more-results">追加で20件を見る</button>
+           <p class="hint">いま${state.pool.length}件。押したときだけ、次の20件を取りに行きます（1分類は60件まで）</p></div>`
+      : `<div class="more"><button class="btn wide" disabled>これ以上の候補はありません</button>
+           <p class="hint">1分類あたり60件までです（いま${state.pool.length}件）</p></div>`;
   }
 
   function locate(done) {
@@ -833,20 +865,22 @@
   // ---------- 数字選択（件数）・日付選択 ----------
   function openCountWheel() {
     pendingCount = state.count;
+    // 追加で取った候補の数（20より多い）も選べるように、今の件数を一覧に足す
+    const counts = [...new Set([...COUNTS, state.count])].sort((a, b) => a - b);
     const sheetEl = openSheet('件数', `
       <div class="wheel-wrap"><div class="wheel-hi"></div>
-        <div class="wheel" id="wheel">${COUNTS.map((n) => `<div class="wi" data-act="wi" data-n="${n}">${n}件</div>`).join('')}</div>
+        <div class="wheel" id="wheel">${counts.map((n) => `<div class="wi" data-act="wi" data-n="${n}">${n}件</div>`).join('')}</div>
       </div>
       <p class="hint">数字をスクロールして選び、「決める」を押してください。</p>
       <div class="stack"><button class="btn primary wide" data-act="count-ok">決める</button></div>`);
     const w = $('#wheel', sheetEl);
-    const idx = COUNTS.indexOf(state.count);
+    const idx = counts.indexOf(state.count);
     w.scrollTop = idx * ITEM_H;
     const mark = (i) => $$('.wi', w).forEach((el, j) => el.classList.toggle('on', j === i));
     mark(idx);
     w.addEventListener('scroll', () => {
-      const i = Math.min(Math.max(Math.round(w.scrollTop / ITEM_H), 0), COUNTS.length - 1);
-      pendingCount = COUNTS[i];
+      const i = Math.min(Math.max(Math.round(w.scrollTop / ITEM_H), 0), counts.length - 1);
+      pendingCount = counts[i];
       mark(i);
     }, { passive: true });
   }
@@ -1000,7 +1034,7 @@
   function currentConditions() {
     return {
       area: { mode: state.area.mode, address: state.area.address },
-      radius: state.radius, count: state.count, industries: [...state.industries],
+      radius: state.radius, count: state.count, category: state.category,
     };
   }
 
@@ -1031,7 +1065,7 @@
     state.area = { mode: p.area.mode, address: p.area.address, lat: null, lng: null };
     state.radius = p.radius;
     state.count = p.count;
-    state.industries = new Set(p.industries);
+    state.category = CATS.some(([k]) => k === p.category) ? p.category : 'all';
     renderAll();
     toast(`「${p.name}」を反映しました`);
   }
@@ -1363,20 +1397,8 @@
     'p-view': (el) => { state.pView = el.dataset.v; renderProposal(); },
     'map-open': () => openMapViewer(),
     'preset-save-ok': () => confirmSavePreset(),
-    'ind-tab': (el) => { state.indTab = Number(el.dataset.i); renderInd(); },
-    ind: (el) => { const n = el.dataset.name; state.industries.has(n) ? state.industries.delete(n) : state.industries.add(n); renderInd(); },
-    'ind-all': () => {
-      const everyIndustry = D.GROUPS.every((gr) => gr.items.every((n) => state.industries.has(n)));
-      state.industries.clear();
-      if (!everyIndustry) D.GROUPS.forEach((gr) => gr.items.forEach((n) => state.industries.add(n)));
-      renderInd();
-    },
-    'ind-group': () => {
-      const g = D.GROUPS[state.indTab].items;
-      const all = g.every((n) => state.industries.has(n));
-      g.forEach((n) => (all ? state.industries.delete(n) : state.industries.add(n)));
-      renderInd();
-    },
+    cat: (el) => { if (CATS.some(([k]) => k === el.dataset.v)) { state.category = el.dataset.v; renderInd(); } },
+    'more-results': () => loadMore(),
     'preset-save': savePreset,
     'preset-apply': (el) => applyPreset(Number(el.dataset.i)),
     'preset-del': (el) => deletePreset(Number(el.dataset.i)),

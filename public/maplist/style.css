@@ -105,6 +105,13 @@ button:disabled { opacity: .45; cursor: default; }
   background: transparent; color: var(--sub); font-weight: 600; font-size: 14px; white-space: nowrap;
 }
 .seg.two button { flex: 1; }
+.seg.three button { flex: 1; }
+/* 点数の項目名は1行に（「情報の充実度」が途中で割れないように） */
+.scores .score span { white-space: nowrap; font-size: 11px; letter-spacing: 0; }
+/* 追加で20件を見る（提案リストの下）：押せない表示のときは薄く */
+.more { margin-top: 14px; }
+.more .hint { margin: 8px 0 0; text-align: center; }
+.more .btn:disabled { opacity: .45; cursor: default; }
 .seg button.on {
   background: linear-gradient(var(--k-black), var(--k-black)) padding-box, var(--aurora) border-box; color: var(--text);
 }
