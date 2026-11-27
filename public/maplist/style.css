@@ -235,6 +235,8 @@ button:disabled { opacity: .45; cursor: default; }
 .dock .btn { flex: 1; }
 /* 一覧／地図の切り替え（ドックの中で横いっぱい） */
 .dock .view-seg { flex: 1; }
+/* 「提案リストを作る」は、横いっぱいではなく、少しだけ短く（Round 27） */
+.dock .btn.wide { max-width: 330px; margin: 0 auto; }
 .tabs {
   position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 6;
   height: 62px; border-radius: 31px; display: grid; grid-template-columns: repeat(4, 1fr);
@@ -339,7 +341,7 @@ button:disabled { opacity: .45; cursor: default; }
 .menu-item .ic { color: var(--sub); }
 .menu-item span { flex: 1; }
 .menu-cnt { font-style: normal; font-size: 12px; color: var(--muted); background: var(--k-grey); border-radius: 999px; padding: 2px 8px; }
-.screen { padding-top: 84px; }
+.screen { padding-top: 14px; } /* Round 27：上のバーの下からすぐ見出しに（間を詰める） */
 
 /* 横にスクロールする行の端のグレーの縁（グラデーション）は出さない（ユーザー指示・Round 18） */
 .hwrap { position: relative; }
