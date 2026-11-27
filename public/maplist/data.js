@@ -145,14 +145,15 @@
 
     // 店舗の候補を返す（ウェブサイトなし・チェーン除外・営業中のみ。近い順に最大50件）
     //  center: {lat,lng}, radius: m, town: 町名まるごとか, viewport: 町名の範囲, industries: 業種名の配列（空＝全業種）
-    async searchShops({ center, radius, town = false, viewport = null, industries = [] }) {
-      const list = industries && industries.length ? industries : ALL_ITEMS;
-      const j = await api('/api/ml-search', { center, radius, town, viewport, industries: list });
-      return (j.shops || [])
+    // category: 'food'（飲食店）／'other'（飲食店以外）／'all'（両方）。page: 1から（1ページ20件）
+    // 返す：{ shops（近い順）, hasMore（次のページがあるか） }
+    async searchShops({ center, radius, town = false, viewport = null, category = 'all', page = 1 }) {
+      const j = await api('/api/ml-search', { center, radius, town, viewport, category, page });
+      const shops = (j.shops || [])
         .map((s) => ({ ...s, distance: haversine(center, s) }))
         .filter((s) => town || s.distance <= radius)  // 町名まるごとは範囲（矩形）で絞っている
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 50);
+        .sort((a, b) => a.distance - b.distance);
+      return { shops, hasMore: j.hasMore === true };
     },
 
     // 住所・町名 → 座標（範囲も返す）。見つからなければ null
