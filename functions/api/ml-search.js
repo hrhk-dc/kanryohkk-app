@@ -8,12 +8,12 @@
 import { keyOf, searchAll, buildShops, placesErrorText, PLACES_CAP } from "../../lib/vla-core.js";
 import { hitLimit, clientIp, tooMany } from "../../lib/rate-limit.js";
 import { searchCacheKey, cachedSearch } from "../../lib/search-cache.js";
-import { categoryBaseKey, categoryBody, placesPage, getCategoryPage, labelOf, MAX_PAGES } from "../../lib/category-search.js";
+import { categorySearchPage, CATEGORY_CHOICES } from "../../lib/category-search.js";
+const MAX_PAGES = 3;
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 
-const CATEGORIES_OF = { food: ["food"], other: ["other"], all: ["food", "other"] };
 
 export async function onRequestPost({ request, env }) {
   const lim = hitLimit(`search:${clientIp(request)}`, 10, 60_000);
@@ -31,35 +31,14 @@ export async function onRequestPost({ request, env }) {
   const geo = { center, radius: Number(radius) || 1000, town: !!town, viewport };
   const cache = typeof caches !== "undefined" ? caches.default : null;
 
-  // 新しい方式：分類とページで取る
+  // 新しい方式：分類とページで取る（業種ごとの検索を合わせた候補を、距離順に20件ずつ返す）
   if (category !== undefined) {
-    const cats = CATEGORIES_OF[category];
-    if (!cats) return json({ ok: false, error: "分類は food・other・all のどれかです" }, 400);
+    if (!CATEGORY_CHOICES.includes(category)) return json({ ok: false, error: "分類は food・other・all のどれかです" }, 400);
     const pg = page === undefined ? 1 : Number(page);
     if (!Number.isInteger(pg) || pg < 1 || pg > MAX_PAGES) return json({ ok: false, error: `ページは1から${MAX_PAGES}までです` }, 400);
     try {
       const hits = [];
-      const base = categoryBaseKey(geo);
-      const parts = await Promise.all(cats.map((c) => getCategoryPage({
-        cache, base, category: c, page: pg, hits,
-        call: (token) => placesPage(key, categoryBody(c, geo), token),
-      })));
-      const raw = [];
-      const industryOf = new Map();
-      const typesOf = new Map();
-      let hasMore = false;
-      parts.forEach((part, i) => {
-        const c = cats[i];
-        if (part.hasMore) hasMore = true;
-        for (const p of part.places) {
-          const label = labelOf(p, c);
-          if (c === "other" && label === "飲食店") continue; // 飲食店以外の分類では、飲食店と判定された店を外す
-          raw.push(p);
-          if (!industryOf.has(p.id)) industryOf.set(p.id, label);
-          if (!typesOf.has(p.id)) typesOf.set(p.id, Array.isArray(p.types) ? p.types : []);
-        }
-      });
-      const shops = buildShops(raw, industryOf).slice(0, PLACES_CAP * 4).map((s) => ({ ...s, types: typesOf.get(s.id) || [] }));
+      const { shops, hasMore } = await categorySearchPage({ key, cache, geo, category, page: pg, hits });
       const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
       if (hits.length) headers["X-Cache"] = hits.join(",");
       return new Response(JSON.stringify({ ok: true, shops, hasMore, page: pg, category }), { headers });
