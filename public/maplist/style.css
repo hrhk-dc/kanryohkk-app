@@ -397,6 +397,47 @@ button:disabled { opacity: .45; cursor: default; }
   border-radius: 22px; background: #0B0D12; border: 1px solid var(--line);
 }
 .map-img { display: block; width: 100%; height: auto; }
+/* 地図画像：タップすると、全画面の画像ビューアが開く */
+.map-open { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none; cursor: zoom-in; border-radius: 14px; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+/* 画像ビューア（全画面）：ピンチ・ダブルタップ・ドラッグで拡大と移動。下へスワイプか × で閉じる */
+.mv { position: fixed; inset: 0; z-index: 90; background: rgba(5, 6, 9, .96); transition: background .15s; }
+.mv-sheet { position: absolute; inset: 0; }
+.mv-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mv-pic {
+  position: absolute; left: 50%; top: 50%; width: 640px; height: 440px; margin: -220px 0 0 -320px;
+  max-width: none; transform-origin: 50% 50%; pointer-events: none; -webkit-user-drag: none; user-select: none;
+}
+.mv-stage.anim .mv-pic { transition: transform .22s ease-out; }
+.mv-stage.drag .mv-pic { transition: none; }
+.mv-sheet { transition: transform .2s ease-out; }
+.mv-top {
+  position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px;
+  display: flex; align-items: center; justify-content: space-between; pointer-events: none;
+}
+.mv-title {
+  padding: 8px 14px; border-radius: 999px; background: rgba(11, 13, 18, .86);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); font-size: 13px; font-weight: 600; color: var(--text);
+}
+.mv-btn {
+  pointer-events: auto; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(11, 13, 18, .86); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease-out;
+}
+.mv-btn:active { transform: scale(.94); }
+.mv-btn .ic { width: 20px; height: 20px; margin: 0; color: var(--sub); stroke-width: 1.5; }
+.mv-btn.mv-wide { width: auto; padding: 0 16px; }
+.mv-bottom {
+  position: absolute; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+.mv-tools { display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.mv-tools .mv-btn { pointer-events: auto; }
+.mv-zoom { min-width: 56px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); }
+.mv-hint, .mv-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
+.mv-note:empty { display: none; }
 .map-order { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .map-order li {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;

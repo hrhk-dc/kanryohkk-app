@@ -33,8 +33,16 @@ export async function onRequestPost({ request, env }) {
     : [];
   if (!points.length) return json({ ok: false, error: "地図に出す店がありません" }, 400);
 
+  // 拡大して見るとき：中心（center）と拡大（zoom）を指定できる。省くと、店の位置に合わせて自動で入る（今までどおり）
+  const c = body?.center;
+  const view = c && Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 85 && Math.abs(c.lng) <= 180
+    && Number.isInteger(body?.zoom) && body.zoom >= 0 && body.zoom <= 19
+    ? { lat: c.lat, lng: c.lng, zoom: body.zoom }
+    : null;
+
   const params = [
     "size=640x440", "scale=2", "maptype=roadmap",
+    ...(view ? [`center=${view.lat},${view.lng}`, `zoom=${view.zoom}`] : []),
     ...STYLES.map((s) => `style=${encodeURIComponent(s)}`),
     ...points.map((p, i) => `markers=${encodeURIComponent(`color:0x00B4D8|label:${LABELS[i]}|${p.lat},${p.lng}`)}`),
     `key=${encodeURIComponent(key)}`,
