@@ -385,14 +385,16 @@ button:disabled { opacity: .45; cursor: default; }
 .view-seg { margin-top: 12px; }
 /* 地図（対話式・Leaflet＋OpenStreetMap）。店は番号ピン（一覧の番号と同じ色）、自分の位置は青い点 */
 .map-card { margin-top: 12px; }
-.map-box { height: 320px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #0B0D12; position: relative; }
+/* isolation：Leaflet のペイン（z-index 400〜1000）を、この地図の中だけに閉じ込める（全画面の表示より下にする） */
+.map-box { height: 320px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #0B0D12; position: relative; isolation: isolate; }
 .map-box > .hint { padding: 14px; text-align: center; }
 .map-box .leaflet-container { background: #0B0D12; font-family: inherit; }
 .map-box .leaflet-tile-pane { filter: brightness(.8) saturate(.85); }
 .leaflet-bar { border: 1px solid rgba(255, 255, 255, .18) !important; border-radius: 14px !important; overflow: hidden; box-shadow: none !important; }
 .leaflet-bar a { background: rgba(11, 13, 18, .9) !important; color: var(--text) !important; border-bottom: 1px solid rgba(255, 255, 255, .12) !important; width: 34px !important; height: 34px !important; line-height: 34px !important; }
-.leaflet-control-attribution { background: rgba(11, 13, 18, .72) !important; color: var(--muted) !important; font-size: 10px !important; }
-.leaflet-control-attribution a { color: var(--sub) !important; }
+/* 帰属表示：目立たせない（© OpenStreetMap contributors と、そのリンクは残す。消さない） */
+.leaflet-control-attribution { background: rgba(11, 13, 18, .45) !important; color: rgba(255, 255, 255, .5) !important; font-size: 9px !important; line-height: 1.3 !important; padding: 0 4px !important; border-radius: 6px 0 0 0; }
+.leaflet-control-attribution a { color: rgba(255, 255, 255, .6) !important; text-decoration: underline; }
 .lp-wrap { background: none !important; border: 0 !important; }
 .lp-pin {
   display: grid; place-items: center; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%;
@@ -407,7 +409,28 @@ button:disabled { opacity: .45; cursor: default; }
 .map-order li.on { border-color: rgba(125, 211, 255, .6); box-shadow: 0 0 0 1px rgba(125, 211, 255, .25); }
 .map-order li.on .pin-no { box-shadow: inset 0 0 0 1.5px #7DD3FF, 0 0 10px rgba(125, 211, 255, .6); }
 /* 全画面の地図（指で動かして拡大縮小。× か Esc で閉じる） */
-.mapfull { position: fixed; inset: 0; z-index: 90; background: #0B0D12; }
+.mapfull { position: fixed; inset: 0; z-index: 10000; background: #0B0D12; }
+/* 全画面を開いている間は、詳細のシート（店の情報）を全画面の上に出す */
+:host(.mapfull-open) .sheet-root { z-index: 10001; }
+.mapfull.has-sel .mapfull-hint { display: none; }
+/* 地図の拡大・縮小ボタンは、上の題名の段の下に出す（題名と重ならないように） */
+.mapfull-map .leaflet-top { top: calc(64px + env(safe-area-inset-top)); }
+.mapfull-hint { bottom: calc(40px + env(safe-area-inset-bottom)) !important; }
+.mapfull-bar {
+  position: absolute; left: 12px; right: 12px; bottom: calc(34px + env(safe-area-inset-bottom)); z-index: 1000;
+  padding: 12px 14px; border-radius: 22px; background: rgba(11, 13, 18, .94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14), 0 10px 24px rgba(0, 0, 0, .5);
+}
+.mapfull-bar[hidden] { display: none; }
+.fb-top { display: flex; align-items: center; gap: 10px; }
+.fb-top .pin-no { flex: none; }
+.fb-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-dist { flex: none; font-size: 12px; color: var(--muted); }
+.fb-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.fb-row .tag { flex: none; }
+.fb-addr { font-size: 12px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fb-hours { margin: 6px 0 8px; font-size: 13px; color: var(--sub); }
+.mapfull-bar .btn.small { min-height: 40px; }
 .mapfull-map { position: absolute; inset: 0; }
 .mapfull-top {
   position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 1000;
