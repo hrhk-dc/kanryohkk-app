@@ -157,6 +157,57 @@
     rec: (a, b) => b.overall - a.overall || a.distance - b.distance,
     dist: (a, b) => a.distance - b.distance,
   };
+  // ルート順：並べる元はおすすめ順（出発点を決めるときに使う）。実際の順番は routeList で作る
+  SORTERS.route = SORTERS.rec;
+
+  // 2つの店の間の距離（m）。地図と同じ球面距離
+  function geoDist(a, b) {
+    const R = 6371000, t = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * t, dLng = (b.lng - a.lng) * t;
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+  }
+  const hasPos = (s) => s.lat != null && s.lng != null;
+  // ルートの出発点：検索の中心（あれば）→ 現在地 → 一覧の先頭の店 の順
+  function routeStart(list) {
+    const c = state.searchArgs && state.searchArgs.center;
+    if (c && c.lat != null && c.lng != null) return { lat: c.lat, lng: c.lng };
+    if (state.area.lat != null && state.area.lng != null) return { lat: state.area.lat, lng: state.area.lng };
+    const first = list.find(hasPos);
+    return first ? { lat: first.lat, lng: first.lng } : null;
+  }
+  // ルート順：出発点から、いちばん近い店を順に選ぶ（最近傍法）。そのあと2-opt を1パス（区間を入れ替えて短くなるところを直す）。
+  // 位置の無い店は最後に回す。各店に、前の店からの区間距離（leg）を入れる（出発点からの最初の店は、出発点からの距離）
+  function routeList(list) {
+    const from = routeStart(list);
+    const pts = list.filter(hasPos);
+    const none = list.filter((s) => !hasPos(s));
+    if (!from || !pts.length) return list.map((s) => ({ ...s, leg: null }));
+    const left = pts.slice(), seq = [];
+    let cur = from;
+    while (left.length) {
+      let bi = 0, bd = Infinity;
+      left.forEach((s, i) => { const d = geoDist(cur, s); if (d < bd) { bd = d; bi = i; } });
+      cur = left.splice(bi, 1)[0];
+      seq.push(cur);
+    }
+    // 2-opt（1パス）：出発点は動かさない。途中を反転して、合計が短くなるときだけ入れ替える
+    const P = [from, ...seq], n = seq.length;
+    for (let i = 1; i <= n - 1; i++) {
+      for (let j = i + 1; j <= n; j++) {
+        const before = geoDist(P[i - 1], P[i]) + (j < n ? geoDist(P[j], P[j + 1]) : 0);
+        const after = geoDist(P[i - 1], P[j]) + (j < n ? geoDist(P[i], P[j + 1]) : 0);
+        if (after < before - 1e-6) P.splice(i, j - i + 1, ...P.slice(i, j + 1).reverse());
+      }
+    }
+    const out = [];
+    let prev = from;
+    P.slice(1).forEach((s) => { out.push({ ...s, leg: geoDist(prev, s) }); prev = s; });
+    none.forEach((s) => out.push({ ...s, leg: null }));
+    return out;
+  }
+  // 合計の道のり（ルート順の区間の和）。道のりの表示に使う
+  const routeTotal = (list) => list.reduce((a, s) => a + (s.leg || 0), 0);
 
   // ---------- 状態 ----------
   const today = todayJst();
@@ -431,11 +482,15 @@
 
   // ---------- 提案リスト ----------
   function visibleList() {
-    let list = state.pool.slice().sort(SORTERS[state.pSort]);
+    let list = state.pool.slice().sort(SORTERS[state.pSort] || SORTERS.rec);
     if (state.pIndustries.size) list = list.filter((s) => state.pIndustries.has(s.industry));
     if (state.openOnly) list = list.filter((s) => isOpenOn(s, state.date));
+    // ルート順は、絞り込みのあとの店で、毎回作り直す（業種や営業中の変更にも合う）
+    if (state.pSort === 'route') list = routeList(list);
     return list; // 件数の指定はなし。候補（1ページ目の20件・追加ぶんも含む）すべてから作る
   }
+  // 距離の表示：ルート順のときは、前の店からの区間距離（出発点からの最初の店は、その距離）
+  const legText = (s) => (state.pSort === 'route' ? (s.leg == null ? '—' : fmtDist(s.leg)) : fmtDist(s.distance));
 
   function renderProposal() {
     const sn = state.snap;
@@ -516,7 +571,7 @@
       <ul class="reasons">${s.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
       <p class="meta">${ic('pin')}<span>${esc(s.address)}</span></p>
       <div class="meta-row">
-        <span class="dist">${fmtDist(s.distance)}</span>
+        <span class="dist">${state.pSort === 'route' ? '前から ' : ''}${legText(s)}</span>
         ${!hasHoursData(s) ? '<span class="vtime">営業時間は不明</span>' : open ? `<span class="vtime">${esc((s.hours || {})[weekKey(state.date)])}</span>` : '<span class="vtime closed">選択日は定休日</span>'}
         ${s.insta ? `<a class="pill-btn" href="https://www.instagram.com/${esc(s.insta)}" target="_blank" rel="noopener">${ic('insta')}@${esc(s.insta)}</a>` : ''}
       </div>
@@ -955,11 +1010,11 @@
 
   // ---------- 地図で見る（店の位置を番号つきのピンで並べる） ----------
   const PIN = '123456789ABCDEFGHIJK'; // 番号（画面の並びと地図のピンが一致する）
-  const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順' };
+  const SORT_LABEL = { rec: 'おすすめ順', dist: '近い順', route: 'ルート順' };
   // ---------- 地図（対話式：Leaflet＋OpenStreetMap。店は番号つきのピン。自分の位置は青い点） ----------
   // 指で動かして拡大縮小できる。ピンか一覧の店を押すと、その店が選ばれる（ピン・一覧・店名を同じにそろえる）
   const MAP_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const MAP_ATTR = '© OpenStreetMap contributors';
+  const MAP_ATTR = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>';
   let leafletReady = null;
   let inlineMap = null;          // 提案リストの中の地図
   let fullMap = null;            // 全画面の地図（開いているときだけ）
@@ -995,12 +1050,15 @@
 
   function mapPanelHTML(list) {
     if (!list.length) return `<div class="empty"><p>条件に合う店がありませんでした。</p></div>`;
+    const routeHint = state.pSort === 'route'
+      ? `ルートの合計は約${fmtDist(routeTotal(list))}です（出発点から、番号の順に回ります）。`
+      : `並び順は「${SORT_LABEL[state.pSort]}」です。番号の順に回ると効率的です。`;
     return `<div class="map-card">
       <div class="map-box" id="mapBox"><p class="hint">地図を読み込んでいます…</p></div>
       <div class="map-tools"><button class="pill-btn" data-act="map-full">${ic('ext')}全画面で見る</button></div>
       <p class="map-sel" id="mapSel">${selText(list)}</p>
-      <p class="hint">並び順は「${SORT_LABEL[state.pSort]}」です。番号の順に回ると効率的です。</p>
-      <ol class="map-order">${list.map((s, i) => `<li class="${state.mapSel === s.id ? 'on' : ''}" data-act="map-pick" data-id="${esc(s.id)}"><span class="pin-no">${PIN[i]}</span><span class="map-name">${esc(s.name)}</span><small>${fmtDist(s.distance)}</small></li>`).join('')}</ol>
+      <p class="hint">${routeHint}</p>
+      <ol class="map-order">${list.map((s, i) => `<li class="${state.mapSel === s.id ? 'on' : ''}" data-act="map-pick" data-id="${esc(s.id)}"><span class="pin-no">${PIN[i]}</span><span class="map-name">${esc(s.name)}</span><small>${state.pSort === 'route' ? '前から ' : ''}${legText(s)}</small></li>`).join('')}</ol>
     </div>`;
   }
 
@@ -1013,20 +1071,30 @@
     });
   }
 
-  // 地図を作る：店の番号ピン・自分の位置（取得済みのときだけ）。全部が入るように広さを合わせる
+  // 地図を作る：店の番号ピン・自分の位置（取得済みのときだけ）。全部が入るように広さを合わせる。
+  // ルート順のときは、出発点から①②…へ線で結ぶ
   function buildMap(el, list) {
     const L = window.L;
-    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 3, maxZoom: 19 });
+    const baseClass = el.getAttribute("class") || "";   // Leaflet を付ける前の印（外すときに戻す）
+    const map = L.map(el, { zoomControl: true, attributionControl: false, minZoom: 3, maxZoom: 19 });
+    // 帰属表示は「© OpenStreetMap contributors」だけ残す（Leaflet の名前は外して、小さく）
+    L.control.attribution({ prefix: false }).addTo(map);
     L.tileLayer(MAP_TILE, { maxZoom: 19, attribution: MAP_ATTR }).addTo(map);
     const markers = new Map();
     const pts = [];
     list.forEach((s, i) => {
-      if (s.lat == null || s.lng == null) return;
+      if (!hasPos(s)) return;
       const m = L.marker([s.lat, s.lng], { icon: pinIcon(L, PIN[i], s.id), keyboard: false, title: s.name }).addTo(map);
       m.on('click', () => selectShop(s.id, false));
       markers.set(s.id, m);
       pts.push([s.lat, s.lng]);
     });
+    if (state.pSort === 'route') {
+      const from = routeStart(list);
+      const line = from ? [[from.lat, from.lng]] : [];
+      list.forEach((s) => { if (hasPos(s)) line.push([s.lat, s.lng]); });
+      if (line.length > 1) L.polyline(line, { color: '#7DD3FF', weight: 3, opacity: .85, dashArray: '6 6', interactive: false }).addTo(map);
+    }
     if (state.area.lat != null && state.area.lng != null) {
       L.marker([state.area.lat, state.area.lng], {
         icon: L.divIcon({ className: 'lp-wrap', html: '<span class="lp-me" title="いまの位置"></span>', iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -1038,30 +1106,40 @@
     if (pts.length > 1) map.fitBounds(pts, { padding: [28, 28], maxZoom: 17 });
     else if (pts.length === 1) map.setView(pts[0], 16);
     else map.setView([35.68, 139.76], 12);
-    const entry = { map, markers };
+    const entry = { map, markers, el, baseClass };
     mapSets.add(entry);
     return entry;
   }
 
+  // 地図を外す。Leaflet は要素の中身と印（leaflet-container）を残すことがあるので、元の要素に戻す（二重に数えられないように）
   function dropMap(entry) {
     if (!entry) return;
     mapSets.delete(entry);
     entry.map.remove();
+    entry.el.setAttribute("class", entry.baseClass);
+    entry.el.innerHTML = "";
     if (inlineMap === entry) inlineMap = null;
   }
 
   function dropInline() { if (inlineMap) dropMap(inlineMap); }
 
-  // 提案リストの中の地図を出す（画面が変わるまでに、読み込みが終わったときだけ）
+  // 提案リストの中の地図を出す。描き直しが重なったら、いちばん新しい一回だけ残す（同じ要素に二重に作らない）
+  let mapGen = 0;
   async function mountMap(list) {
+    const gen = ++mapGen;
     dropInline();
     const el = $('#mapBox');
     if (!el) return;
     ensureLeafletCss();
-    try { await loadLeaflet(); } catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
-    const box = $('#mapBox');
-    if (!box || state.pView !== 'map') return;
-    inlineMap = buildMap(box, list);
+    try { await loadLeaflet(); } catch (e) { if (gen === mapGen && $('#mapBox')) $('#mapBox').innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+    if (gen !== mapGen) return;            // 待っている間に、もっと新しい描き直しが始まった
+    if (fullMap || fullOpening) return;    // 全画面を開いている間は、提案の地図を出さない（二重になるため）
+    if (state.pView !== 'map') return;
+    dropInline();
+    let box = $('#mapBox');
+    if (!box) return;
+    if (box._leaflet_id) { const fresh = box.cloneNode(false); box.replaceWith(fresh); box = fresh; } // Leaflet が使い終えていない要素は作り直す
+    try { inlineMap = buildMap(box, list); } catch (e) { box.innerHTML = '<p class="hint">地図を出せませんでした。もう一度お試しください</p>'; return; }
     selectShop(state.mapSel, false);
   }
 
@@ -1085,16 +1163,22 @@
       const li = state.mapSel ? root.querySelector(`.map-order li[data-id="${CSS.escape(state.mapSel)}"]`) : null;
       sel.textContent = li ? `${li.querySelector('.map-name').textContent}　${li.querySelector('small').textContent}` : '店のピンを押すと、ここに店名が出ます';
     }
+    renderFullBar();
   }
 
   // 全画面の地図（指で動かして、拡大縮小。下の一覧と同じ番号・同じ店）
+  // 開くときは、提案の地図を外す（二重に出ないように）。閉じたら、提案の地図をまた出す
+  let fullOpening = false;
   function openFullMap() {
-    if (fullMap) return;
+    if (fullMap || fullOpening) return;     // 連打しても、一度だけ開く
     const list = visibleList();
     if (!list.length) return;
+    fullOpening = true;                     // 読み込みを待つ間も、二回目は弾く
+    dropInline();
     ensureLeafletCss();
     loadLeaflet().then(() => {
       if (fullMap) return;
+      dropInline();
       const wrap = document.createElement('div');
       wrap.className = 'mapfull';
       wrap.setAttribute('role', 'dialog');
@@ -1102,14 +1186,20 @@
       wrap.setAttribute('aria-label', '地図（全画面）');
       wrap.innerHTML = `<div class="mapfull-map" id="mapFullBox"></div>
         <div class="mapfull-top"><span class="mapfull-title">店の位置</span><button type="button" class="mapfull-x" aria-label="閉じる">${ic('x')}</button></div>
-        <p class="mapfull-hint">ピンを押すと、その店が選ばれます。指で動かして、拡大・縮小できます</p>`;
+        <p class="mapfull-hint">ピンを押すと、その店の情報が下に出ます</p>
+        <div class="mapfull-bar" id="mapFullBar" hidden></div>`;
       root.appendChild(wrap);
       const entry = buildMap(wrap.querySelector('#mapFullBox'), list);
-      fullMap = { wrap, entry };
+      fullMap = { wrap, entry, list };
+      root.host.classList.add('mapfull-open');
       wrap.querySelector('.mapfull-x').addEventListener('click', closeFullMap);
+      wrap.querySelector('#mapFullBar').addEventListener('click', (e) => {
+        if (e.target.closest('[data-fb="detail"]') && state.mapSel) openShopSheet(state.mapSel);
+      });
       document.addEventListener('keydown', fullKey);
+      setTimeout(() => { if (fullMap && fullMap.entry === entry) entry.map.invalidateSize(); }, 60);   // 開いた直後の大きさを合わせる
       selectShop(state.mapSel, false);
-    }).catch((e) => toast(e.message));
+    }).catch((e) => toast(e.message)).finally(() => { fullOpening = false; });
   }
   function fullKey(e) { if (e.key === 'Escape') closeFullMap(); }
   function closeFullMap() {
@@ -1117,7 +1207,52 @@
     dropMap(fullMap.entry);
     fullMap.wrap.remove();
     document.removeEventListener('keydown', fullKey);
+    root.host.classList.remove('mapfull-open');
     fullMap = null;
+    if (!$('#sheet').hidden) closeSheet();
+    if (state.pView === 'map' && $('#mapBox')) mountMap(visibleList());   // 提案の地図を、もう一度出す
+  }
+
+  // 全画面の下のバー：選んだ店の番号・店名・業種・住所・距離・当日の営業時間（定休日・不明も分かるように）
+  function hoursLine(s) {
+    if (!hasHoursData(s)) return '営業時間は不明';
+    const t = (s.hours || {})[weekKey(state.date)];
+    return t ? `${fmtDate(state.date)}　${esc(t)}` : `${fmtDate(state.date)}は定休日`;
+  }
+  function renderFullBar() {
+    if (!fullMap) return;
+    const bar = fullMap.wrap.querySelector('#mapFullBar');
+    const idx = fullMap.list.findIndex((x) => x.id === state.mapSel);
+    fullMap.wrap.classList.toggle('has-sel', idx >= 0);
+    if (idx < 0) { bar.hidden = true; bar.innerHTML = ''; return; }
+    const s = fullMap.list[idx];
+    bar.hidden = false;
+    bar.innerHTML = `<div class="fb-top"><span class="pin-no">${PIN[idx]}</span><span class="fb-name">${esc(s.name)}</span><span class="fb-dist">${state.pSort === 'route' ? '前から ' : ''}${legText(s)}</span></div>
+      <div class="fb-row"><span class="tag">${esc(s.industry) || '業種は不明'}</span><span class="fb-addr">${esc(s.address)}</span></div>
+      <p class="fb-hours">${hoursLine(s)}</p>
+      <button type="button" class="btn small" data-fb="detail">詳しく見る</button>`;
+  }
+
+  // 店の詳細（既存の openSheet を使う）：電話・サイト・Instagram・訪問の状態・訪問予定に追加・Map URLコピー・訪問NG
+  function openShopSheet(id) {
+    const s = visibleList().find((x) => x.id === id) || findShop(id);   // 一覧の中の店（ルート順の区間距離も入っている）
+    if (!s) return;
+    const links = [
+      has(s.phone) ? `<a class="pill-btn" href="tel:${esc(s.phone)}">電話 ${esc(s.phone)}</a>` : '',
+      has(s.website) && /^https?:\/\//.test(s.website) ? `<a class="pill-btn" href="${esc(s.website)}" target="_blank" rel="noopener">サイトを見る</a>` : '',
+      has(s.insta) ? `<a class="pill-btn" href="https://www.instagram.com/${esc(s.insta)}" target="_blank" rel="noopener">${ic('insta')}@${esc(s.insta)}</a>` : '',
+    ].filter(Boolean).join('');
+    const status = s.visited ? '訪問済みの店です' : inVisit(id) ? '訪問予定に入っています' : inLater(id) ? '後で訪問に入っています' : '';
+    openSheet(s.name, `
+      <p class="sub">${esc(s.industry) || '業種は不明'}　${esc(s.address)}</p>
+      <p class="sub">${state.pSort === 'route' ? '前から ' : ''}${legText(s)}　${hoursLine(s)}</p>
+      ${status ? `<div class="banner">${ic('info')}${status}</div>` : ''}
+      ${links ? `<div class="meta-row">${links}</div>` : ''}
+      <div class="actions">
+        <button class="btn" data-act="add" data-id="${esc(id)}" ${inVisit(id) ? 'disabled' : ''}>${ic('plus')}${inVisit(id) ? '追加済み' : '訪問予定に追加'}</button>
+        <button class="btn" data-act="copy-map" data-id="${esc(id)}">${ic('copy')}Map URLコピー</button>
+        <button class="btn text" data-act="block" data-id="${esc(id)}">${ic('block')}訪問NG</button>
+      </div>`);
   }
 
   // ---------- 固定ヘッダーのメニュー ----------

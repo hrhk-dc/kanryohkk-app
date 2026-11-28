@@ -55,7 +55,7 @@ const OSM_SHOPS = [
 
     // 1) 並び替えは「おすすめ順」「近い順」の2つ。評価順はない
     const sorts = await page.evaluate(() => [...document.querySelectorAll('#mlSortBar [data-ml-sort]')].map((b) => b.dataset.mlSort));
-    ok('並び替えは おすすめ順・近い順 の2つ（評価順はない）', sorts.join('/') === 'rec/dist', sorts.join('/'));
+    ok('並び替えは おすすめ順・近い順・ルート順（評価順はない）', sorts.join('/') === 'rec/dist/route', sorts.join('/'));
 
     // 2) 提案：営業中のフィルタは、営業時間が無い店を落とさない（「不明」として残す）
     const cardsOn = await page.evaluate(() => {
